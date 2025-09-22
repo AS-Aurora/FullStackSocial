@@ -106,3 +106,47 @@ class LogoutView(APIView):
         response.delete_cookie('jwt-auth')
         response.delete_cookie('jwt-refresh-token')
         return response
+    
+
+class UpdateProfilePictureView(APIView):
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request):
+        """
+        Update user's profile picture with Cloudinary URL
+        Expected payload: {"profile_picture_url": "https://res.cloudinary.com/..."}
+        """
+        profile_picture_url = request.data.get('profile_picture_url')
+        
+        if not profile_picture_url:
+            return Response({
+                'detail': 'profile_picture_url is required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Basic URL validation (you can make this more robust)
+        if not profile_picture_url.startswith('https://res.cloudinary.com/'):
+            return Response({
+                'detail': 'Invalid Cloudinary URL'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Update user's profile picture
+        request.user.profile_picture = profile_picture_url
+        request.user.save()
+        
+        return Response({
+            'detail': 'Profile picture updated successfully',
+            'profile_picture_url': request.user.profile_picture_url
+        }, status=status.HTTP_200_OK)
+    
+    def delete(self, request):
+        """
+        Remove user's profile picture (set to default)
+        """
+        request.user.profile_picture = None
+        request.user.save()
+        
+        return Response({
+            'detail': 'Profile picture removed, using default',
+            'profile_picture_url': request.user.profile_picture_url
+        }, status=status.HTTP_200_OK)
+
