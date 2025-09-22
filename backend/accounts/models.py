@@ -2,14 +2,18 @@ import uuid
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 
+def user_profile_picture_path(instance, filename):
+    """Generate file path for user profile pictures"""
+    return f'profile_pictures/user_{instance.id}/{filename}'
 
 class CustomUser(AbstractUser):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     email = models.EmailField(unique=True)
-    profile_picture = models.URLField(
-        max_length=500,
+    profile_picture = models.ImageField(
+        upload_to=user_profile_picture_path,
         null=True, 
         blank=True,
+        help_text="Upload a profile picture"
     )
     location = models.CharField(
         max_length=100, 
@@ -42,33 +46,3 @@ class CustomUser(AbstractUser):
     @property
     def full_name(self):
         return f"{self.first_name} {self.last_name}".strip() or self.username
-    
-    @property
-    def profile_picture_url(self):
-        """
-        Get the profile picture URL with fallback to default Cloudinary image.
-        Returns the Cloudinary URL or a default avatar.
-        """
-        if self.profile_picture:
-            return self.profile_picture
-        else:
-            # Default avatar from Cloudinary
-            # You can upload a default avatar to your Cloudinary and use its URL
-            # Or use Cloudinary's built-in avatar generation
-            default_avatar_url = "https://res.cloudinary.com/your-cloud-name/image/upload/v1/default-avatar.jpg"
-            return default_avatar_url
-    
-    def get_profile_picture_url(self):
-        """
-        Alternative method to get profile picture URL.
-        Useful for API serializers and templates.
-        """
-        return self.profile_picture_url
-    
-    @staticmethod
-    def get_default_avatar_url():
-        """
-        Static method to get default avatar URL.
-        Useful when you need the default avatar without a user instance.
-        """
-        return "https://res.cloudinary.com/your-cloud-name/image/upload/v1/default-avatar.jpg"

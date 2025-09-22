@@ -14,7 +14,7 @@ load_dotenv(BASE_DIR / '.env')
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-iaop(2rvd!jl2-+k2-*xden(f81@qm$q#1x+r2%6y+)1e4mdno')
+SECRET_KEY = os.getenv('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DEBUG', 'True').lower() == 'true'
@@ -183,18 +183,10 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = 'static/'
-STATIC_ROOT = BASE_DIR / 'staticfiles'
 
-# Media files (User uploaded content) - Using Cloudinary
-MEDIA_URL = 'media/'
+# Media files (User uploaded files)
+MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
-
-CLOUDINARY_CLOUD_NAME = os.getenv('CLOUDINARY_CLOUD_NAME')
-CLOUDINARY_API_KEY = os.getenv('CLOUDINARY_API_KEY')
-CLOUDINARY_API_SECRET = os.getenv('CLOUDINARY_API_SECRET')
-
-# Default avatar URL (update with your actual Cloudinary URL)
-DEFAULT_AVATAR_URL = f"https://res.cloudinary.com/{CLOUDINARY_CLOUD_NAME}/image/upload/v1/default-avatar.jpg"
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
