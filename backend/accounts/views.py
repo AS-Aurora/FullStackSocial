@@ -14,6 +14,9 @@ from .adapters import CustomAccountAdapter
 from .serializers import UserSerializer
 from rest_framework import permissions
 from rest_framework import generics
+from django.contrib.auth.tokens import default_token_generator
+from django.utils.http import urlsafe_base64_decode
+from django.utils.encoding import force_str
 
 User = get_user_model()
 
@@ -46,6 +49,59 @@ class PasswordResetView(APIView):
         except Exception as e:
             return Response({
                 'detail': 'An error occurred while sending the password reset email.'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class PasswordResetConfirmView(APIView):
+    permission_classes = [AllowAny]
+    
+    def post(self, request):
+        uid = request.data.get('uid')
+        token = request.data.get('token')
+        new_password = request.data.get('new_password')
+        confirm_password = request.data.get('confirm_password')
+        
+        if not all([uid, token, new_password, confirm_password]):
+            return Response({
+                'detail': 'All fields are required.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        if new_password != confirm_password:
+            return Response({
+                'detail': 'Passwords do not match.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        if len(new_password) < 8:
+            return Response({
+                'detail': 'Password must be at least 8 characters long.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            # Decode the user ID
+            user_id = force_str(urlsafe_base64_decode(uid))
+            user = User.objects.get(pk=user_id)
+            
+            # Check if token is valid
+            if default_token_generator.check_token(user, token):
+                user.set_password(new_password)
+                user.save()
+                
+                return Response({
+                    'detail': 'Password has been reset successfully.',
+                    'message': 'You can now log in with your new password.'
+                }, status=status.HTTP_200_OK)
+            else:
+                return Response({
+                    'detail': 'Invalid or expired reset link.'
+                }, status=status.HTTP_400_BAD_REQUEST)
+                
+        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+            return Response({
+                'detail': 'Invalid reset link.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({
+                'detail': 'An error occurred while resetting the password.'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
