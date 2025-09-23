@@ -11,6 +11,9 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework import serializers
 from .adapters import CustomAccountAdapter
+from .serializers import UserSerializer
+from rest_framework import permissions
+from rest_framework import generics
 
 User = get_user_model()
 
@@ -106,3 +109,9 @@ class LogoutView(APIView):
         response.delete_cookie('jwt-auth')
         response.delete_cookie('jwt-refresh-token')
         return response
+
+class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = User.objects.all()
+    serializer_class = UserSerializer
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+    lookup_field = 'id'
