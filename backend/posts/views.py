@@ -5,9 +5,16 @@ from .models import Post, Comment
 from .serializers import PostSerializer, CommentSerializer
 
 class PostViewSet(viewsets.ModelViewSet):
-    queryset = Post.objects.all()
     serializer_class = PostSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+
+    def get_queryset(self):
+        return Post.objects.filter(is_active=True).order_by('-created_at')
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context['request'] = self.request
+        return context
 
     def perform_create(self, serializer):
         serializer.save(author=self.request.user)
@@ -16,13 +23,23 @@ class PostViewSet(viewsets.ModelViewSet):
     def like(self, request, pk=None):
         post = self.get_object()
         post.likes.add(request.user)
-        return Response({"status": "liked", "like_count": post.like_count})
+        serializer = self.get_serializer(post)
+        return Response({
+            "status": "liked", 
+            "like_count": post.like_count,
+            "is_liked": True
+        })
 
     @action(detail=True, methods=["post"], permission_classes=[permissions.IsAuthenticated])
     def unlike(self, request, pk=None):
         post = self.get_object()
         post.likes.remove(request.user)
-        return Response({"status": "unliked", "like_count": post.like_count})
+        serializer = self.get_serializer(post)
+        return Response({
+            "status": "unliked", 
+            "like_count": post.like_count,
+            "is_liked": False
+        })
 
 
 class CommentViewSet(viewsets.ModelViewSet):
