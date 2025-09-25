@@ -41,6 +41,25 @@ class PostViewSet(viewsets.ModelViewSet):
             "is_liked": False
         })
 
+    @action(detail=True, methods=["get", "post"], url_path="comments", permission_classes=[permissions.IsAuthenticatedOrReadOnly])
+    def comments(self, request, pk=None):
+        post = self.get_object()
+        
+        if request.method == "GET":
+            comments = Comment.objects.filter(post=post, is_active=True).order_by('-created_at')
+            serializer = CommentSerializer(comments, many=True, context={'request': request})
+            return Response(serializer.data)
+        
+        elif request.method == "POST":
+            if not request.user.is_authenticated:
+                return Response({"detail": "Authentication required"}, status=status.HTTP_401_UNAUTHORIZED)
+            
+            serializer = CommentSerializer(data=request.data, context={'request': request})
+            if serializer.is_valid():
+                serializer.save(author=request.user, post=post)
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 class CommentViewSet(viewsets.ModelViewSet):
     queryset = Comment.objects.all()
