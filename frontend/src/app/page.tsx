@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 import { useRouter } from "next/navigation";
+import Comments from "../components/Comments";
 
-// Heart SVG Component
 const HeartIcon = ({ filled = false, size = 20 }: { filled?: boolean; size?: number }) => (
   <svg
     width={size}
@@ -44,6 +44,7 @@ export default function Home() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [expandedComments, setExpandedComments] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     setLoading(true);
@@ -91,10 +92,8 @@ export default function Home() {
 
       let response;
       if (newIsLiked) {
-        // Like the post
         response = await axios.post(`http://localhost:8000/api/posts/${postId}/like/`, {}, { withCredentials: true });
       } else {
-        // Unlike the post
         response = await axios.post(`http://localhost:8000/api/posts/${postId}/unlike/`, {}, { withCredentials: true });
       }
 
@@ -130,6 +129,18 @@ export default function Home() {
       setError(`Failed to ${post?.is_liked ? 'unlike' : 'like'} post. Please try again.`);
       setTimeout(() => setError(null), 3000);
     }
+  };
+
+  const toggleComments = (postId: string) => {
+    setExpandedComments(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(postId)) {
+        newSet.delete(postId);
+      } else {
+        newSet.add(postId);
+      }
+      return newSet;
+    });
   };
 
   return (
@@ -263,13 +274,19 @@ export default function Home() {
 
                     {/* Comment Button */}
                     <button
-                      onClick={() => router.push(`/post/${post.id}`)}
-                      className="flex items-center space-x-2 px-3 py-1.5 rounded-full text-gray-600 hover:bg-gray-50 hover:text-blue-600 transition-all duration-200"
+                      onClick={() => toggleComments(post.id)}
+                      className={`flex items-center space-x-2 px-3 py-1.5 rounded-full transition-all duration-200 ${
+                        expandedComments.has(post.id)
+                          ? 'bg-blue-50 text-blue-600 hover:bg-blue-100'
+                          : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
+                      }`}
                     >
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                         <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
                       </svg>
-                      <span className="text-sm font-medium">Comment</span>
+                      <span className="text-sm font-medium">
+                        {expandedComments.has(post.id) ? 'Hide Comments' : 'Comment'}
+                      </span>
                     </button>
                   </div>
                 </div>
@@ -283,6 +300,13 @@ export default function Home() {
                         : `${post.like_count} people like this`
                       }
                     </p>
+                  </div>
+                )}
+
+                {/* Comments Section */}
+                {expandedComments.has(post.id) && (
+                  <div className="mt-3 pt-3 border-t border-gray-100">
+                    <Comments postId={post.id} />
                   </div>
                 )}
               </div>
