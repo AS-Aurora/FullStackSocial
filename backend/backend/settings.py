@@ -49,6 +49,8 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
 
+    'channels',
+
     'accounts',
     'posts'
 ]
@@ -83,6 +85,32 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'backend.wsgi.application'
+
+ASGI_APPLICATION = "backend.asgi.application"
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [("127.0.0.1", 6379)],
+        },
+    },
+}
+
+# Fallback to in-memory channel layer if Redis is not available
+if DEBUG:
+    try:
+        import redis
+        r = redis.Redis(host='127.0.0.1', port=6379, db=0)
+        r.ping()
+    except (redis.ConnectionError, ImportError):
+        # Fall back to in-memory channel layer for development
+        CHANNEL_LAYERS = {
+            "default": {
+                "BACKEND": "channels.layers.InMemoryChannelLayer"
+            }
+        }
+
 
 
 # Database
