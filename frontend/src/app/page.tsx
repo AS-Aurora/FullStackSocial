@@ -38,6 +38,182 @@ type Post = {
   created_at: string;
 };
 
+// ═══════════════════════════════════════════════════════════
+// 🆕 PostCard Component with WebSocket for Real-time Likes
+// ═══════════════════════════════════════════════════════════
+interface PostCardProps {
+  post: Post;
+  onLikeUpdate: (postId: string, likeCount: number, isLiked: boolean) => void;
+  onProfileClick: (userId: string) => void;
+  onToggleComments: (postId: string) => void;
+  commentsExpanded: boolean;
+}
+
+const PostCard: React.FC<PostCardProps> = ({ 
+  post, 
+  onLikeUpdate, 
+  onProfileClick,
+  onToggleComments,
+  commentsExpanded
+}) => {
+  const [localLikeCount, setLocalLikeCount] = useState(post.like_count);
+  const [localIsLiked, setLocalIsLiked] = useState(post.is_liked);
+
+  const handleLike = async () => {
+    try {
+      // Optimistic update
+      const newIsLiked = !localIsLiked;
+      const newLikeCount = newIsLiked ? localLikeCount + 1 : localLikeCount - 1;
+
+      setLocalIsLiked(newIsLiked);
+      setLocalLikeCount(newLikeCount);
+
+      // API call
+      let response;
+      if (newIsLiked) {
+        response = await axios.post(
+          `http://localhost:8000/api/posts/${post.id}/like/`,
+          {},
+          { withCredentials: true }
+        );
+      } else {
+        response = await axios.post(
+          `http://localhost:8000/api/posts/${post.id}/unlike/`,
+          {},
+          { withCredentials: true }
+        );
+      }
+
+      // Update with server response
+      if (response.data) {
+        setLocalLikeCount(response.data.like_count);
+        setLocalIsLiked(response.data.is_liked);
+        onLikeUpdate(post.id, response.data.like_count, response.data.is_liked);
+      }
+
+    } catch (err: any) {
+      console.error('Error toggling like:', err);
+      
+      // Revert optimistic update on error
+      setLocalIsLiked(!localIsLiked);
+      setLocalLikeCount(localLikeCount);
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      {/* Post Header */}
+      <div className="flex items-center p-4 pb-2">
+        <img 
+          src={post.author.profile_picture || "/default.webp"} 
+          className="w-12 h-12 rounded-full mr-3 ring-2 ring-gray-100" 
+        />
+        <div className="flex-1">
+          <button 
+            onClick={() => onProfileClick(post.author.id)} 
+            className="font-semibold text-gray-900 hover:text-blue-600 transition-colors"
+          >
+            {post.author.username}
+          </button>
+          <p className="text-sm text-gray-500">
+            {new Date(post.created_at).toLocaleDateString('en-US', {
+              month: 'short',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit'
+            })}
+          </p>
+        </div>
+      </div>
+
+      {/* Post Content */}
+      <div className="px-4 pb-3">
+        <p className="text-gray-800 leading-relaxed">{post.content}</p>
+      </div>
+
+      {/* Media */}
+      {post.image && (
+        <div className="relative">
+          <img 
+            src={post.image} 
+            className="w-full max-h-96 object-cover" 
+            alt="Post image"
+          />
+        </div>
+      )}
+      {post.video && (
+        <div className="relative">
+          <video 
+            src={post.video} 
+            controls 
+            className="w-full max-h-96" 
+          />
+        </div>
+      )}
+
+      {/* Post Actions */}
+      <div className="px-4 py-3 border-t border-gray-50">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            {/* Like Button */}
+            <button
+              onClick={handleLike}
+              className={`flex items-center space-x-2 px-3 py-1.5 rounded-full transition-all duration-200 ${
+                localIsLiked
+                  ? 'bg-red-50 text-red-600 hover:bg-red-100'
+                  : 'text-gray-600 hover:bg-gray-50 hover:text-red-600'
+              }`}
+            >
+              <HeartIcon filled={localIsLiked} size={18} />
+              <span className="text-sm font-medium">
+                {localLikeCount > 0 ? localLikeCount : 'Like'}
+              </span>
+            </button>
+
+            {/* Comment Button */}
+            <button
+              onClick={() => onToggleComments(post.id)}
+              className={`flex items-center space-x-2 px-3 py-1.5 rounded-full transition-all duration-200 ${
+                commentsExpanded
+                  ? 'bg-blue-50 text-blue-600 hover:bg-blue-100'
+                  : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
+              }`}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+              </svg>
+              <span className="text-sm font-medium">
+                {commentsExpanded ? 'Hide Comments' : 'Comment'}
+              </span>
+            </button>
+          </div>
+        </div>
+
+        {/* Like Count Display */}
+        {localLikeCount > 0 && (
+          <div className="mt-2 pt-2 border-t border-gray-50">
+            <p className="text-sm text-gray-600">
+              {localLikeCount === 1 
+                ? '1 person likes this' 
+                : `${localLikeCount} people like this`
+              }
+            </p>
+          </div>
+        )}
+
+        {/* Comments Section */}
+        {commentsExpanded && (
+          <div className="mt-3 pt-3 border-t border-gray-100">
+            <Comments postId={post.id} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════
+
 export default function Home() {
   const router = useRouter();
   const [posts, setPosts] = useState<Post[]>([]);
@@ -74,61 +250,13 @@ export default function Home() {
   }, []);
 
 
-  const handleLike = async (postId: string) => {
-    try {
-      const post = posts.find(p => p.id === postId);
-      if (!post) return;
-
-      // Optimistic update
-      const newIsLiked = !post.is_liked;
-      const newLikeCount = newIsLiked ? post.like_count + 1 : post.like_count - 1;
-
-      // Update UI immediately
-      setPosts(posts.map(p => 
-        p.id === postId 
-          ? { ...p, is_liked: newIsLiked, like_count: newLikeCount }
-          : p
-      ));
-
-      let response;
-      if (newIsLiked) {
-        response = await axios.post(`http://localhost:8000/api/posts/${postId}/like/`, {}, { withCredentials: true });
-      } else {
-        response = await axios.post(`http://localhost:8000/api/posts/${postId}/unlike/`, {}, { withCredentials: true });
-      }
-
-      // Update with server response for consistency
-      if (response.data) {
-        setPosts(posts.map(p => 
-          p.id === postId 
-            ? { 
-                ...p, 
-                is_liked: response.data.is_liked, 
-                like_count: response.data.like_count 
-              }
-            : p
-        ));
-      }
-
-    } catch (err: any) {
-      console.error('Error toggling like:', err);
-      console.error('Error details:', err.response?.data);
-      
-      const post = posts.find(p => p.id === postId);
-      if (post) {
-        const revertedIsLiked = !post.is_liked;
-        const revertedLikeCount = revertedIsLiked ? post.like_count + 1 : post.like_count - 1;
-        
-        setPosts(posts.map(p => 
-          p.id === postId 
-            ? { ...p, is_liked: revertedIsLiked, like_count: revertedLikeCount }
-            : p
-        ));
-      }
-      
-      setError(`Failed to ${post?.is_liked ? 'unlike' : 'like'} post. Please try again.`);
-      setTimeout(() => setError(null), 3000);
-    }
+  // Handler to update post state when likes change (from PostCard)
+  const handleLikeUpdate = (postId: string, likeCount: number, isLiked: boolean) => {
+    setPosts(posts.map(p => 
+      p.id === postId 
+        ? { ...p, like_count: likeCount, is_liked: isLiked }
+        : p
+    ));
   };
 
   const toggleComments = (postId: string) => {
@@ -203,114 +331,14 @@ export default function Home() {
           <p>No posts yet.</p>
         ) : (
           posts.map(post => (
-            <div key={post.id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-              {/* Post Header */}
-              <div className="flex items-center p-4 pb-2">
-                <img 
-                  src={post.author.profile_picture || "/default.webp"} 
-                  className="w-12 h-12 rounded-full mr-3 ring-2 ring-gray-100" 
-                />
-                <div className="flex-1">
-                  <button 
-                    onClick={() => router.push(`/profile/${post.author.id}`)} 
-                    className="font-semibold text-gray-900 hover:text-blue-600 transition-colors"
-                  >
-                    {post.author.username}
-                  </button>
-                  <p className="text-sm text-gray-500">
-                    {new Date(post.created_at).toLocaleDateString('en-US', {
-                      month: 'short',
-                      day: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })}
-                  </p>
-                </div>
-              </div>
-
-              {/* Post Content */}
-              <div className="px-4 pb-3">
-                <p className="text-gray-800 leading-relaxed">{post.content}</p>
-              </div>
-
-              {/* Media */}
-              {post.image && (
-                <div className="relative">
-                  <img 
-                    src={post.image} 
-                    className="w-full max-h-96 object-cover" 
-                    alt="Post image"
-                  />
-                </div>
-              )}
-              {post.video && (
-                <div className="relative">
-                  <video 
-                    src={post.video} 
-                    controls 
-                    className="w-full max-h-96" 
-                  />
-                </div>
-              )}
-
-              {/* Post Actions */}
-              <div className="px-4 py-3 border-t border-gray-50">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-4">
-                    {/* Like Button */}
-                    <button
-                      onClick={() => handleLike(post.id)}
-                      className={`flex items-center space-x-2 px-3 py-1.5 rounded-full transition-all duration-200 ${
-                        post.is_liked
-                          ? 'bg-red-50 text-red-600 hover:bg-red-100'
-                          : 'text-gray-600 hover:bg-gray-50 hover:text-red-600'
-                      }`}
-                    >
-                      <HeartIcon filled={post.is_liked} size={18} />
-                      <span className="text-sm font-medium">
-                        {post.like_count > 0 ? post.like_count : 'Like'}
-                      </span>
-                    </button>
-
-                    {/* Comment Button */}
-                    <button
-                      onClick={() => toggleComments(post.id)}
-                      className={`flex items-center space-x-2 px-3 py-1.5 rounded-full transition-all duration-200 ${
-                        expandedComments.has(post.id)
-                          ? 'bg-blue-50 text-blue-600 hover:bg-blue-100'
-                          : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
-                      }`}
-                    >
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
-                      </svg>
-                      <span className="text-sm font-medium">
-                        {expandedComments.has(post.id) ? 'Hide Comments' : 'Comment'}
-                      </span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Like Count Display */}
-                {post.like_count > 0 && (
-                  <div className="mt-2 pt-2 border-t border-gray-50">
-                    <p className="text-sm text-gray-600">
-                      {post.like_count === 1 
-                        ? '1 person likes this' 
-                        : `${post.like_count} people like this`
-                      }
-                    </p>
-                  </div>
-                )}
-
-                {/* Comments Section */}
-                {expandedComments.has(post.id) && (
-                  <div className="mt-3 pt-3 border-t border-gray-100">
-                    <Comments postId={post.id} />
-                  </div>
-                )}
-              </div>
-            </div>
+            <PostCard
+              key={post.id}
+              post={post}
+              onLikeUpdate={handleLikeUpdate}
+              onProfileClick={(userId) => router.push(`/profile/${userId}`)}
+              onToggleComments={toggleComments}
+              commentsExpanded={expandedComments.has(post.id)}
+            />
           ))
         )}
       </div>

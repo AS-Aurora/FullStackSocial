@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import axios from "axios";
+import { useWebSocket } from '../hooks/useWebSocket';
 
 interface Comment {
   id: string;
@@ -22,6 +23,22 @@ const Comments: React.FC<CommentsProps> = ({ postId }) => {
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const { sendMessage, isConnected } = useWebSocket({
+    postId,
+    onCommentReceived: (comment) => {
+      console.log('💬 Real-time comment received:', comment)
+      // Check if comment already exists (avoid duplicates)
+      setComments((prev) => {
+        const exists = prev.some(c => c.id === comment?.id);
+        if (exists) return prev;
+        return [...prev, comment as Comment];
+      });
+    },
+    onError: (message) => {
+      console.error('❌ WebSocket error:', message);
+    }
+  });
 
   const fetchComments = async () => {
     try {
@@ -46,6 +63,13 @@ const Comments: React.FC<CommentsProps> = ({ postId }) => {
         content: newComment,
       }, { withCredentials: true });
       setComments((prev) => [...prev, res.data]);
+      
+      // Send WebSocket message to notify other users
+      sendMessage({
+        type: 'comment', 
+        comment: newComment
+      });
+      
       setNewComment("");
     } catch (err) {
       console.error(err);

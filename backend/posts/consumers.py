@@ -97,7 +97,7 @@ class PostConsumer(AsyncWebsocketConsumer):
         from .models import Post, Comment
         
         post = Post.objects.get(id=post_id)
-        return Comment.objects.create(user=user, post=post, content=comment_data.get("content", ""))
+        return Comment.objects.create(author=user, post=post, content=comment_data.get("content", ""))
     
     @database_sync_to_async
     def toggle_like(self, user, post_id, like):
