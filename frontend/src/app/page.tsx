@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 import { useRouter } from "next/navigation";
-import PostCard from "@/components/PostCard";
+import Comments from "../components/Comments";
 
 const HeartIcon = ({ filled = false, size = 20 }: { filled?: boolean; size?: number }) => (
   <svg
@@ -36,8 +36,6 @@ type Post = {
   like_count: number;
   is_liked: boolean;
   created_at: string;
-  comment_count: number;
-  comments: any[];
 };
 
 export default function Home() {
@@ -169,16 +167,150 @@ export default function Home() {
         )}
       </div>
 
-      
-      {/* Posts Area */}
+      {/* Posts Feed */}
       <div className="flex-1 p-4 space-y-6">
+        {/* Error Message */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4">
+            {error}
+          </div>
+        )}
+        
         {loading ? (
-          <p>Loading posts...</p>
+          <div className="space-y-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="bg-white rounded-lg shadow p-4 animate-pulse">
+                <div className="flex items-center mb-2">
+                  <div className="w-10 h-10 rounded-full bg-gray-200 mr-3"></div>
+                  <div className="h-4 bg-gray-200 rounded w-1/4"></div>
+                </div>
+                <div className="h-4 bg-gray-200 rounded mb-2"></div>
+                <div className="h-32 bg-gray-200 rounded mb-2"></div>
+              </div>
+            ))}
+          </div>
+        ) : error ? (
+          <div className="bg-red-50 text-red-700 p-4 rounded-lg">
+            <p>{error}</p>
+            <button 
+              onClick={() => window.location.reload()} 
+              className="mt-2 text-red-600 hover:underline"
+            >
+              Retry
+            </button>
+          </div>
         ) : posts.length === 0 ? (
           <p>No posts yet.</p>
         ) : (
           posts.map(post => (
-            <PostCard key={post.id} post={post} currentUserId={""} />
+            <div key={post.id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+              {/* Post Header */}
+              <div className="flex items-center p-4 pb-2">
+                <img 
+                  src={post.author.profile_picture || "/default.webp"} 
+                  className="w-12 h-12 rounded-full mr-3 ring-2 ring-gray-100" 
+                />
+                <div className="flex-1">
+                  <button 
+                    onClick={() => router.push(`/profile/${post.author.id}`)} 
+                    className="font-semibold text-gray-900 hover:text-blue-600 transition-colors"
+                  >
+                    {post.author.username}
+                  </button>
+                  <p className="text-sm text-gray-500">
+                    {new Date(post.created_at).toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </p>
+                </div>
+              </div>
+
+              {/* Post Content */}
+              <div className="px-4 pb-3">
+                <p className="text-gray-800 leading-relaxed">{post.content}</p>
+              </div>
+
+              {/* Media */}
+              {post.image && (
+                <div className="relative">
+                  <img 
+                    src={post.image} 
+                    className="w-full max-h-96 object-cover" 
+                    alt="Post image"
+                  />
+                </div>
+              )}
+              {post.video && (
+                <div className="relative">
+                  <video 
+                    src={post.video} 
+                    controls 
+                    className="w-full max-h-96" 
+                  />
+                </div>
+              )}
+
+              {/* Post Actions */}
+              <div className="px-4 py-3 border-t border-gray-50">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    {/* Like Button */}
+                    <button
+                      onClick={() => handleLike(post.id)}
+                      className={`flex items-center space-x-2 px-3 py-1.5 rounded-full transition-all duration-200 ${
+                        post.is_liked
+                          ? 'bg-red-50 text-red-600 hover:bg-red-100'
+                          : 'text-gray-600 hover:bg-gray-50 hover:text-red-600'
+                      }`}
+                    >
+                      <HeartIcon filled={post.is_liked} size={18} />
+                      <span className="text-sm font-medium">
+                        {post.like_count > 0 ? post.like_count : 'Like'}
+                      </span>
+                    </button>
+
+                    {/* Comment Button */}
+                    <button
+                      onClick={() => toggleComments(post.id)}
+                      className={`flex items-center space-x-2 px-3 py-1.5 rounded-full transition-all duration-200 ${
+                        expandedComments.has(post.id)
+                          ? 'bg-blue-50 text-blue-600 hover:bg-blue-100'
+                          : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
+                      }`}
+                    >
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+                      </svg>
+                      <span className="text-sm font-medium">
+                        {expandedComments.has(post.id) ? 'Hide Comments' : 'Comment'}
+                      </span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Like Count Display */}
+                {post.like_count > 0 && (
+                  <div className="mt-2 pt-2 border-t border-gray-50">
+                    <p className="text-sm text-gray-600">
+                      {post.like_count === 1 
+                        ? '1 person likes this' 
+                        : `${post.like_count} people like this`
+                      }
+                    </p>
+                  </div>
+                )}
+
+                {/* Comments Section */}
+                {expandedComments.has(post.id) && (
+                  <div className="mt-3 pt-3 border-t border-gray-100">
+                    <Comments postId={post.id} />
+                  </div>
+                )}
+              </div>
+            </div>
           ))
         )}
       </div>

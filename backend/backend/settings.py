@@ -86,8 +86,6 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'backend.wsgi.application'
 
-ASGI_APPLICATION = "backend.asgi.application"
-
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
@@ -96,22 +94,6 @@ CHANNEL_LAYERS = {
         },
     },
 }
-
-# Fallback to in-memory channel layer if Redis is not available
-if DEBUG:
-    try:
-        import redis
-        r = redis.Redis(host='127.0.0.1', port=6379, db=0)
-        r.ping()
-    except (redis.ConnectionError, ImportError):
-        # Fall back to in-memory channel layer for development
-        CHANNEL_LAYERS = {
-            "default": {
-                "BACKEND": "channels.layers.InMemoryChannelLayer"
-            }
-        }
-
-
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
