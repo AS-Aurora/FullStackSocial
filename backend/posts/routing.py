@@ -1,6 +1,6 @@
-from django.urls import path
+from django.urls import re_path
 from . import consumers
 
 websocket_urlpatterns = [
-    path("ws/posts/<str:post_id>/", consumers.PostConsumer.as_asgi()),
+    re_path(r'ws/posts/(?P<post_id>[0-9a-f-]+)/$', consumers.PostConsumer.as_asgi()),
 ]
