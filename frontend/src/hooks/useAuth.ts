@@ -53,7 +53,7 @@ export const useAuth = (): AuthStatus => {
         return false;
       }
     } catch (error) {
-      // console.error('Auth check failed:', error);
+      console.error('Auth check failed:', error);
       setIsAuthenticated(false);
       setUser(null);
       return false;
