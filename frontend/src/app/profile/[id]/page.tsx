@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import axios from "axios";
+import { motion } from "framer-motion";
 
 type UserProfile = {
   id: string;
@@ -11,6 +12,7 @@ type UserProfile = {
   profile_picture?: string;
   location?: string;
   bio?: string;
+  created_at?: string;
 };
 
 export default function ProfilePage() {
@@ -22,56 +24,93 @@ export default function ProfilePage() {
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
-    
     try {
-      await axios.post('http://localhost:8000/api/auth/logout/', {}, { withCredentials: true });
-
-      router.push('/login');
-      
-    } catch (error: any) {
-      console.error('Logout error:', error);
-      router.push('/');
+      await axios.post("http://localhost:8000/api/auth/logout/", {}, { withCredentials: true });
+      router.push("/login");
+    } catch (error) {
+      console.error("Logout error:", error);
+      router.push("/");
     } finally {
       setIsLoggingOut(false);
     }
   };
 
   useEffect(() => {
-    axios.get(`http://localhost:8000/api/auth/profile/${id}/`)
-      .then(res => setProfile(res.data))
-      .catch(err => console.error(err));
+    axios
+      .get(`http://localhost:8000/api/auth/profile/${id}/`)
+      .then((res) => setProfile(res.data))
+      .catch((err) => console.error(err));
   }, [id]);
 
-  if (!profile) return <p>Loading...</p>;
+  if (!profile)
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900">
+        <div className="animate-spin h-12 w-12 border-b-2 border-white rounded-full"></div>
+      </div>
+    );
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100 px-4">
-      <div className="w-full max-w-md bg-white shadow-lg rounded-xl p-8 text-center">
-        <img
-          src={profile.profile_picture ? profile.profile_picture : "/default.webp"}
-          alt="Profile"
-          className="w-24 h-24 rounded-full mx-auto mb-4 text-black border-2 border-gray-300"
-        />
-        <h1 className="text-2xl font-bold text-black">{profile.username}</h1>
-        <p className="text-black">{profile.email}</p>
-        <p className="mt-2 text-black">{profile.bio || "No bio yet."}</p>
-        <p className="text-sm text-black">{profile.location}</p>
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 flex items-center justify-center px-4">
+      <motion.div
+        initial={{ opacity: 0, y: 40 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6 }}
+        className="w-full max-w-md backdrop-blur-lg bg-white/10 border border-white/20 shadow-2xl rounded-2xl p-8 text-center"
+      >
+        {/* Profile Picture */}
+        <div className="relative mb-6">
+          <div className="w-28 h-28 mx-auto rounded-full border-2 border-white/30 shadow-lg overflow-hidden">
+            <img
+              src={profile.profile_picture || "/default.webp"}
+              alt="Profile"
+              className="w-full h-full object-cover"
+            />
+          </div>
+        </div>
 
-        <button
-          onClick={() => router.push(`/profile/${id}/edit`)}
-          className="mt-6 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-        >
-          Edit Profile
-        </button>
+        {/* Username & Email */}
+        <h1 className="text-3xl font-semibold text-white mb-1">{profile.username}</h1>
+        <p className="text-sm text-white/60 mb-4">{profile.email}</p>
 
-        <button
-          onClick={handleLogout}
-          disabled={isLoggingOut}
-          className="mt-3 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        >
-          {isLoggingOut ? 'Logging out...' : 'Logout'}
-        </button>
-      </div>
+        {/* Bio */}
+        <p className="text-white/80 italic mb-3">
+          {profile.bio ? `"${profile.bio}"` : "No bio added yet."}
+        </p>
+
+        {/* Location */}
+        {profile.location && (
+          <p className="text-sm text-blue-200 mb-4">
+            📍 {profile.location}
+          </p>
+        )}
+
+        {/* Joined Date */}
+        {profile.created_at && (
+          <p className="text-xs text-white/50 mb-6">
+            Joined {new Date(profile.created_at).toLocaleDateString()}
+          </p>
+        )}
+
+        {/* Buttons */}
+        <div className="space-y-3">
+          <motion.button
+            whileTap={{ scale: 0.95 }}
+            onClick={() => router.push(`/profile/${id}/edit`)}
+            className="w-full py-2.5 text-white font-semibold rounded-lg bg-gradient-to-r from-blue-500 to-purple-500 hover:opacity-90 hover:shadow-lg transition-all"
+          >
+            Edit Profile
+          </motion.button>
+
+          <motion.button
+            whileTap={{ scale: 0.95 }}
+            onClick={handleLogout}
+            disabled={isLoggingOut}
+            className="w-full py-2.5 text-white font-semibold rounded-lg bg-gradient-to-r from-red-500 to-pink-500 hover:opacity-90 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isLoggingOut ? "Logging out..." : "Logout"}
+          </motion.button>
+        </div>
+      </motion.div>
     </div>
   );
 }
