@@ -1,53 +1,94 @@
-from rest_framework import serializers
-from django.contrib.auth import get_user_model
-from .models import Post, Comment
+# from rest_framework import serializers
+# from django.contrib.auth import get_user_model
+# from .models import Post, Comment
 
-User = get_user_model()
+# User = get_user_model()
+
+# class UserSerializer(serializers.ModelSerializer):
+#     class Meta:
+#         model = User
+#         fields = ["id", "username", "profile_picture"]
+
+
+# class CommentSerializer(serializers.ModelSerializer):
+#     author = UserSerializer(read_only=True)
+
+#     class Meta:
+#         model = Comment
+#         fields = ["id", "author", "content", "is_active", "created_at"]
+#         read_only_fields = ["id", "author", "created_at", "is_active"]
+
+#     def create(self, validated_data):
+#         request = self.context.get("request")
+#         validated_data["author"] = request.user
+#         return super().create(validated_data)
+
+
+# class PostSerializer(serializers.ModelSerializer):
+#     author = UserSerializer(read_only=True)
+#     comments = CommentSerializer(many=True, read_only=True)
+#     like_count = serializers.IntegerField(read_only=True)
+#     comment_count = serializers.IntegerField(read_only=True)
+#     is_liked = serializers.SerializerMethodField()
+
+#     class Meta:
+#         model = Post
+#         fields = [
+#             "id", "author", "content", "image", "video",
+#             "privacy", "is_active", "likes",
+#             "like_count", "comment_count", "is_liked",
+#             "comments", "created_at"
+#         ]
+#         read_only_fields = ["id", "author", "likes", "like_count", "comment_count", "is_liked", "created_at"]
+
+#     def get_is_liked(self, obj):
+#         request = self.context.get('request')
+#         if request and request.user.is_authenticated:
+#             return obj.likes.filter(id=request.user.id).exists()
+#         return False
+
+#     def create(self, validated_data):
+#         request = self.context.get("request")
+#         validated_data["author"] = request.user
+#         return super().create(validated_data)
+    
+
+
+from rest_framework import serializers
+from .models import Post, Comment
+from accounts.models import CustomUser
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
-        model = User
-        fields = ["id", "username", "profile_picture"]
-
+        model = CustomUser
+        fields = ['id', 'username', 'email', 'profile_picture', 'full_name']
 
 class CommentSerializer(serializers.ModelSerializer):
     author = UserSerializer(read_only=True)
-
+    
     class Meta:
         model = Comment
-        fields = ["id", "author", "content", "is_active", "created_at"]
-        read_only_fields = ["id", "author", "created_at", "is_active"]
-
-    def create(self, validated_data):
-        request = self.context.get("request")
-        validated_data["author"] = request.user
-        return super().create(validated_data)
-
+        fields = ['id', 'content', 'author', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'author', 'created_at', 'updated_at']
 
 class PostSerializer(serializers.ModelSerializer):
     author = UserSerializer(read_only=True)
     comments = CommentSerializer(many=True, read_only=True)
-    like_count = serializers.IntegerField(read_only=True)
-    comment_count = serializers.IntegerField(read_only=True)
+    like_count = serializers.ReadOnlyField()
+    comment_count = serializers.ReadOnlyField()
     is_liked = serializers.SerializerMethodField()
-
+    
     class Meta:
         model = Post
         fields = [
-            "id", "author", "content", "image", "video",
-            "privacy", "is_active", "likes",
-            "like_count", "comment_count", "is_liked",
-            "comments", "created_at"
+            'id', 'content', 'image', 'video', 'author', 'privacy',
+            'created_at', 'updated_at', 'like_count', 'comment_count',
+            'is_liked', 'comments'
         ]
-        read_only_fields = ["id", "author", "likes", "like_count", "comment_count", "is_liked", "created_at"]
-
+        read_only_fields = ['id', 'author', 'created_at', 'updated_at']
+    
     def get_is_liked(self, obj):
         request = self.context.get('request')
         if request and request.user.is_authenticated:
             return obj.likes.filter(id=request.user.id).exists()
         return False
-
-    def create(self, validated_data):
-        request = self.context.get("request")
-        validated_data["author"] = request.user
-        return super().create(validated_data)
