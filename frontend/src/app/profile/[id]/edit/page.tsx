@@ -5,6 +5,8 @@ import { useParams, useRouter } from "next/navigation";
 import axios from "axios";
 import { motion } from "framer-motion";
 
+const API_BASE_URL = "http://localhost:8000";
+
 export default function EditProfilePage() {
   const { id } = useParams();
   const router = useRouter();
@@ -17,12 +19,11 @@ export default function EditProfilePage() {
   });
   const [preview, setPreview] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     axios
-      .get(`http://localhost:8000/api/auth/profile/${id}/`, {
-        withCredentials: true,
-      })
+      .get(`${API_BASE_URL}/api/auth/profile/${id}/`, {withCredentials: true})
       .then((res) => {
         setUser({
           username: res.data.username || "",
@@ -30,14 +31,29 @@ export default function EditProfilePage() {
           location: res.data.location || "",
           profile_picture: null,
         });
-        setPreview(res.data.profile_picture || null);
+        
+        if (res.data.profile_picture) setPreview(res.data.profile_picture);
       })
-      .catch((err) => console.error(err));
+      .catch((err) => {
+        console.error("Error loading profile:", err);
+        setError("Failed to load profile data");
+      });
   }, [id]);
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (!file.type.startsWith('image/')) {
+        setError("Please select a valid image file");
+        return;
+      }
+
+      if (file.size > 5 * 1024 * 1024) {
+        setError("Image size should be less than 5MB");
+        return;
+      }
+
+      setError(null);
       setUser({ ...user, profile_picture: file });
 
       const reader = new FileReader();
@@ -48,30 +64,37 @@ export default function EditProfilePage() {
 
   const handleSave = async () => {
     setIsSaving(true);
+    setError(null);
+
     const formData = new FormData();
     formData.append("username", user.username);
     formData.append("bio", user.bio);
     formData.append("location", user.location);
-    if (user.profile_picture) {
-      formData.append("profile_picture", user.profile_picture);
-    }
+    
+    if (user.profile_picture) formData.append("profile_picture", user.profile_picture);
 
     try {
       const response = await axios.patch(
-        `http://localhost:8000/api/auth/profile/${id}/`,
+        `${API_BASE_URL}/api/auth/profile/${id}/`,
         formData,
         {
           withCredentials: true,
-          headers: { "Content-Type": "multipart/form-data" },
         }
       );
 
-          console.log("Profile update response:", response.data);
-    console.log("Profile picture URL:", response.data.profile_picture);
-
       router.push(`/profile/${id}`);
-    } catch (error) {
-      console.error(error);
+    } catch (error: any) {
+      console.error("Save error:", error);
+      
+      if (error.response?.data) {
+        const errorData = error.response.data;
+        const errorMessages = Object.entries(errorData)
+          .map(([key, value]) => `${key}: ${value}`)
+          .join(", ");
+        setError(errorMessages || "Failed to save profile");
+      } else {
+        setError("Failed to save profile. Please try again.");
+      }
     } finally {
       setIsSaving(false);
     }
@@ -89,6 +112,13 @@ export default function EditProfilePage() {
           Edit Profile
         </h1>
 
+        {/* Error Message */}
+        {error && (
+          <div className="mb-4 p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-200 text-sm">
+            {error}
+          </div>
+        )}
+
         {/* Profile Picture */}
         <div className="flex flex-col items-center mb-6">
           <div className="relative">
@@ -97,6 +127,10 @@ export default function EditProfilePage() {
                 src={preview}
                 alt="Profile Preview"
                 className="w-28 h-28 rounded-full object-cover border-2 border-white/30 shadow-lg"
+                onError={(e) => {
+                  console.error("Preview image failed to load");
+                  (e.target as HTMLImageElement).src = "/default.webp";
+                }}
               />
             ) : (
               <div className="w-28 h-28 rounded-full bg-white/10 border border-white/20 flex items-center justify-center text-white/70 text-2xl">
@@ -106,6 +140,7 @@ export default function EditProfilePage() {
             <label
               htmlFor="profile_picture"
               className="absolute bottom-1 right-1 bg-blue-500 text-white p-2 rounded-full cursor-pointer hover:bg-blue-600 transition"
+              title="Change profile picture"
             >
               📷
             </label>
@@ -117,6 +152,7 @@ export default function EditProfilePage() {
               className="hidden"
             />
           </div>
+          <p className="text-xs text-white/50 mt-2">Click camera icon to change</p>
         </div>
 
         {/* Username */}
@@ -140,7 +176,9 @@ export default function EditProfilePage() {
             rows={3}
             className="w-full px-4 py-2 rounded-lg bg-white/10 border border-white/20 text-white placeholder-white/50 focus:ring-2 focus:ring-blue-400 outline-none resize-none"
             placeholder="Tell something about yourself..."
+            maxLength={500}
           />
+          <p className="text-xs text-white/50 mt-1">{user.bio.length}/500</p>
         </div>
 
         {/* Location */}
@@ -152,18 +190,30 @@ export default function EditProfilePage() {
             onChange={(e) => setUser({ ...user, location: e.target.value })}
             className="w-full px-4 py-2 rounded-lg bg-white/10 border border-white/20 text-white placeholder-white/50 focus:ring-2 focus:ring-blue-400 outline-none"
             placeholder="e.g., New Delhi, India"
+            maxLength={100}
           />
         </div>
 
-        {/* Save Button */}
-        <motion.button
-          whileTap={{ scale: 0.95 }}
-          onClick={handleSave}
-          disabled={isSaving}
-          className="w-full py-2.5 text-white font-semibold rounded-lg bg-gradient-to-r from-blue-500 to-purple-500 hover:opacity-90 hover:shadow-lg transition-all"
-        >
-          {isSaving ? "Saving..." : "Save Changes"}
-        </motion.button>
+        {/* Buttons */}
+        <div className="space-y-3">
+          <motion.button
+            whileTap={{ scale: 0.95 }}
+            onClick={handleSave}
+            disabled={isSaving}
+            className="w-full py-2.5 text-white font-semibold rounded-lg bg-gradient-to-r from-blue-500 to-purple-500 hover:opacity-90 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isSaving ? "Saving..." : "Save Changes"}
+          </motion.button>
+
+          <motion.button
+            whileTap={{ scale: 0.95 }}
+            onClick={() => router.push(`/profile/${id}`)}
+            disabled={isSaving}
+            className="w-full py-2.5 text-white/80 font-semibold rounded-lg bg-white/10 hover:bg-white/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Cancel
+          </motion.button>
+        </div>
       </motion.div>
     </div>
   );

@@ -109,7 +109,6 @@ class WebSocketService {
         }
       }, delay);
     } else {
-      // console.error(`Max reconnection attempts reached for post ${this.postId}`);
       this.notifyMessageCallbacks({
         type: 'connection_status',
         status: 'failed',

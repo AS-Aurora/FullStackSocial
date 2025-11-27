@@ -35,6 +35,11 @@ export default function ProfilePage() {
     }
   };
 
+  const getImageUrl = (url?: string) => {
+    if (!url) return "/default.webp";
+    return url.startsWith("http") ? url : `http://localhost:8000${url.startsWith('/') ? url : '/' + url}`;
+  };
+
   useEffect(() => {
     axios
       .get(`http://localhost:8000/api/auth/profile/${id}/`)
@@ -61,9 +66,13 @@ export default function ProfilePage() {
         <div className="relative mb-6">
           <div className="w-28 h-28 mx-auto rounded-full border-2 border-white/30 shadow-lg overflow-hidden">
             <img
-              src={profile.profile_picture || "/default.webp"}
+              src={getImageUrl(profile.profile_picture)}
               alt="Profile"
               className="w-full h-full object-cover"
+              onError={(e) => {
+                console.error("Image failed to load:", profile.profile_picture);
+                (e.target as HTMLImageElement).src = "/default.webp";
+              }}
             />
           </div>
         </div>

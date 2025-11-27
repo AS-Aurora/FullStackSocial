@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Post, Comment } from '@/types/post';
 import { createWebSocketService } from '@/service/websocket';
 import { postAPI } from '@/service/api';
@@ -24,17 +24,10 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
     isMountedRef.current = true;
 
     const webSocketService = webSocketServiceRef.current;
-    // console.log(`Initializing WebSocket connection for post: ${post.id}`);
-    
-    // Connect without token - cookies will be sent automatically by the browser
     webSocketService.connect(post.id);
 
     const handleWebSocketMessage = (data: any) => {
-      if (data.post_id !== post.id) {
-        return;
-      }
-
-      // console.log(`WebSocket message received for post ${post.id}:`, data);
+      if (data.post_id !== post.id) return;
       if (!isMountedRef.current) return;
 
       switch (data.type) {
@@ -48,14 +41,9 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
         
         case 'new_comment':
           setCurrentPost(prev => {
-            const commentId = data.comment.id;
-            const commentExists = prev.comments.some(comment => comment.id === commentId);
-            if (commentExists) {
-              // console.log(`Comment ${commentId} already exists, skipping duplicate`);
-              return prev;
-            }
+            const commentExists = prev.comments.some(comment => comment.id === data.comment.id);
+            if (commentExists) return prev;
 
-            // console.log(`Adding new comment ${commentId} to post ${post.id}`);
             return {
               ...prev,
               comments: [data.comment, ...prev.comments],
@@ -66,7 +54,6 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
 
         case 'connection_established':
           setConnectionStatus('connected');
-          // console.log(`WebSocket connection established for post ${post.id}`);
           break;
 
         case 'connection_status':
@@ -80,7 +67,6 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
           break;
 
         case 'error':
-          // console.error(`WebSocket error for post ${post.id}:`, data.error);
           if (data.error === 'Authentication required') {
             setConnectionStatus('unauthorized');
           }
@@ -91,7 +77,6 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
     webSocketService.onMessage(handleWebSocketMessage);
 
     return () => {
-      // console.log(`Cleaning up WebSocket connection for post: ${post.id}`);
       isMountedRef.current = false;
       const webSocketService = webSocketServiceRef.current;
       webSocketService.removeMessageCallback(handleWebSocketMessage);
@@ -99,7 +84,6 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
     };
   }, [post.id, currentPost.author.id]);
 
-  // ... rest of the component remains exactly the same
   const handleLike = async () => {
     if (isLiking) return;
     
@@ -153,10 +137,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
         const newCommentData = await postAPI.createComment(post.id, commentContent);
         setCurrentPost(prev => {
           const commentExists = prev.comments.some(comment => comment.id === newCommentData.id);
-          if (commentExists) {
-            // console.log(`Comment ${newCommentData.id} already exists, skipping duplicate`);
-            return prev;
-          }
+          if (commentExists) return prev;
           
           return {
             ...prev,
@@ -184,28 +165,37 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
     });
   };
 
-  const getConnectionStatusColor = () => {
-    switch (connectionStatus) {
-      case 'connected': return 'bg-green-500';
-      case 'connecting': return 'bg-yellow-500';
-      case 'disconnected': return 'bg-red-500';
-      case 'unauthorized': return 'bg-gray-500';
-      default: return 'bg-gray-500';
-    }
-  };
-
-  const getConnectionStatusText = () => {
-    switch (connectionStatus) {
-      case 'connected': return 'Live';
-      case 'connecting': return 'Connecting';
-      case 'disconnected': return 'Offline';
-      case 'unauthorized': return 'Login Required';
-      default: return 'Unknown';
-    }
-  };
-
   const getCommentKey = (comment: Comment) => {
     return `comment-${comment.id}-${post.id}-${comment.created_at}`;
+  };
+
+  const renderAvatar = (user: any, size: 'small' | 'large' = 'large') => {
+    const sizeClasses = size === 'large' ? 'w-10 h-10' : 'w-8 h-8';
+    const textSize = size === 'large' ? 'text-base' : 'text-sm';
+    
+    if (user?.profile_picture) {
+      return (
+        <img 
+          src={user.profile_picture} 
+          alt={user.username || 'User'} 
+          className={`${sizeClasses} rounded-full object-cover`}
+          onError={(e) => {
+            // Fallback to initial if image fails to load
+            const target = e.target as HTMLImageElement;
+            target.style.display = 'none';
+            if (target.nextElementSibling) {
+              (target.nextElementSibling as HTMLElement).style.display = 'flex';
+            }
+          }}
+        />
+      );
+    }
+    
+    return (
+      <div className={`${sizeClasses} bg-gradient-to-r ${size === 'large' ? 'from-blue-500 to-purple-600' : 'from-green-500 to-blue-600'} rounded-full flex items-center justify-center text-white font-semibold ${textSize}`}>
+        {user?.username?.charAt(0)?.toUpperCase() || 'U'}
+      </div>
+    );
   };
 
   return (
@@ -213,9 +203,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
       {/* Post Header */}
       <div className="p-4 border-b border-gray-100">
         <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold">
-            {currentPost.author?.username?.charAt(0)?.toUpperCase() || 'U'}
-          </div>
+          {renderAvatar(currentPost.author, 'large')}
           <div className="flex-1">
             <div className="flex items-center justify-between">
               <div>
@@ -373,9 +361,7 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
               currentPost.comments.map((comment) => (
                 <div key={getCommentKey(comment)} className="flex space-x-3">
                   <div className="flex-shrink-0">
-                    <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-blue-600 rounded-full flex items-center justify-center text-white text-sm font-semibold">
-                      {comment.author?.username?.charAt(0)?.toUpperCase() || 'U'}
-                    </div>
+                    {renderAvatar(comment.author, 'small')}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="bg-white rounded-lg p-3 border border-gray-200">

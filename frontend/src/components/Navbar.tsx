@@ -22,7 +22,6 @@ const NavBar: React.FC = () => {
       });
 
       if (response.status === 200) {
-        // console.log(response.data);
         
         setUser(response.data);
       } else {
@@ -38,7 +37,7 @@ const NavBar: React.FC = () => {
 
   const handleLogout = async () => {
     try {
-      await axios.post('http://localhost:8000/api/auth/logout/', {
+      await axios.post('http://localhost:8000/api/auth/logout/',{} , {
         withCredentials: true,
       });
       
