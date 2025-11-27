@@ -16,17 +16,13 @@ class Post(models.Model):
     image = models.ImageField(upload_to='post_images/', blank=True, null=True)
     video = models.FileField(upload_to='post_videos/', blank=True, null=True)
     
-    # Author relationship
     author = models.ForeignKey(User, on_delete=models.CASCADE, related_name='posts')
     
-    # Privacy and status
     privacy = models.CharField(max_length=10, choices=PRIVACY_CHOICES, default='public')
     is_active = models.BooleanField(default=True, help_text="False for soft-deleted posts")
     
-    # Engagement (likes only - no dislikes for better UX)
     likes = models.ManyToManyField(User, related_name='liked_posts', blank=True)
     
-    # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
@@ -59,10 +55,8 @@ class Comment(models.Model):
     # Optional: Reply to another comment (nested comments)
     # parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='replies')
     
-    # Status
     is_active = models.BooleanField(default=True, help_text="False for soft-deleted comments")
     
-    # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     

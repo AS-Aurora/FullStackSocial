@@ -158,7 +158,7 @@ class LoginView(APIView):
         return response
 
 class LogoutView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def post(self, request):
         response = Response({"detail": "Successfully logged out."}, status=200)
@@ -166,8 +166,33 @@ class LogoutView(APIView):
         response.delete_cookie('jwt-refresh-token')
         return response
 
-class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+
+class UserDetailView(generics.RetrieveUpdateAPIView):
     queryset = User.objects.all()
     serializer_class = UserSerializer
-    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
     lookup_field = 'id'
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    def get_permissions(self):
+        if self.request.method in ['PATCH', 'PUT']:
+            return [IsAuthenticated()]
+        return []
+
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+
+        if request.user != instance:
+            return Response(
+                {"detail": "You can only edit your own profile."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        serializer = self.get_serializer(
+            instance,
+            data=request.data,
+            partial=True
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)

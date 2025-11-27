@@ -19,8 +19,6 @@ class CustomRegisterSerializer(RegisterSerializer):
             'password1': self.validated_data.get('password1', ''),
         }
 
-User = get_user_model()
-
 class CustomLoginSerializer(LoginSerializer):
     username = serializers.CharField(required=True, allow_blank=False)
     email = None
@@ -48,9 +46,23 @@ class CustomLoginSerializer(LoginSerializer):
             return attrs
         else:
             raise serializers.ValidationError('Must include username and password')
-        
+
 class UserSerializer(serializers.ModelSerializer):
+    # profile_picture = serializers.SerializerMethodField() //This is where the issue was... This line caused the profile picture to be readonly 
+
+    profile_picture = serializers.ImageField(
+        required=False,
+        allow_null=True,
+    )
+    
     class Meta:
         model = User
         fields = ['id', 'username', 'email', 'profile_picture', 'location', 'bio', 'is_email_verified', 'created_at', 'updated_at']
         read_only_fields = ['id', 'email', 'is_email_verified', 'created_at', 'updated_at']
+    
+    def get_profile_picture(self, obj):
+        data = super().get_profile_picture(obj)
+        if obj.profile_picture:
+            request = self.context.get('request')
+            data['profile_picture'] = (request.build_absolute_uri(obj.profile_picture.url) if request else obj.profile_picture.url)
+        return data
