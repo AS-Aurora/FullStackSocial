@@ -3,9 +3,11 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import axios from "axios";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { checkAuth } = useAuth();
   const [user, setUser] = useState({
     username: "",
     password: "",
@@ -23,6 +25,9 @@ export default function LoginPage() {
         user,
         { withCredentials: true }
       );
+
+      await checkAuth();
+
       setData(response.data);
       router.push("/");
     } catch (error: any) {

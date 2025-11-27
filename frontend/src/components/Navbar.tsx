@@ -11,9 +11,19 @@ const NavBar: React.FC = () => {
   const router = useRouter();
   const pathname = usePathname();
 
+  const publicRoutes = ['/login', '/registration', '/forgot-password', '/reset-password', '/verify-email'];
+  
+  const isPublicRoute = publicRoutes.some(route => pathname.startsWith(route));
+
   useEffect(() => {
+    if (isPublicRoute) {
+      setUser(null);
+      setIsLoading(false);
+      return;
+    }
+
     checkAuthStatus();
-  }, [pathname]);
+  }, [pathname, isPublicRoute]);
 
   const checkAuthStatus = async () => {
     try {
@@ -22,13 +32,14 @@ const NavBar: React.FC = () => {
       });
 
       if (response.status === 200) {
-        
         setUser(response.data);
       } else {
         setUser(null);
       }
     } catch (error) {
-      console.error('Error checking auth status:', error);
+      if (!isPublicRoute) {
+        console.error('Error checking auth status:', error);
+      }
       setUser(null);
     } finally {
       setIsLoading(false);
@@ -49,7 +60,7 @@ const NavBar: React.FC = () => {
     }
   };
 
-  if (isLoading) {
+  if (isLoading && !isPublicRoute) {
     return (
       <nav className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -107,7 +118,7 @@ const NavBar: React.FC = () => {
                   Login
                 </Link>
                 <Link 
-                  href="/signup" 
+                  href="/registration" 
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
                 >
                   Sign Up
