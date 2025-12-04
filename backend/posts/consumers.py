@@ -1,9 +1,8 @@
 import json
-import jwt
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from django.contrib.auth import get_user_model
-from django.conf import settings
+from django.contrib.auth.models import AnonymousUser
 from .models import Post, Comment
 
 User = get_user_model()
@@ -12,70 +11,26 @@ class PostConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         self.post_id = self.scope['url_route']['kwargs']['post_id']
         self.room_group_name = f'post_{self.post_id}'
-        self.user = None
-
-        # print(f"WebSocket connection attempt for post: {self.post_id}")
-
-        # Get token from cookies (your CustomJWTAuthentication uses 'jwt-auth' cookie)
-        cookies = self.scope.get('cookies', {})
-        token = cookies.get('jwt-auth')
         
-        if token:
-            # print(f"Token found in cookies: {token[:20]}...")
-            
-            try:
-                # Decode JWT token
-                payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
-                user_id = payload.get('user_id')
-                # print(f"Decoded user_id: {user_id}")
-                
-                if user_id:
-                    self.user = await self.get_user(user_id)
-                    if self.user:
-                        pass
-                        # print(f"Authenticated user: {self.user.username}")
-                    else:
-                        pass
-                        # print("User not found")
-                else:
-                    pass
-                    # print("No user_id in token payload")
-                    
-            except jwt.ExpiredSignatureError:
-                pass
-                # print("JWT token expired")
-            except jwt.InvalidTokenError as e:
-                pass
-                # print(f"Invalid JWT token: {e}")
-            except Exception as e:
-                pass
-                # print(f"Error decoding token: {e}")
-        else:
-            pass
-            # print("No token found in cookies")
+        # Use user from middleware
+        self.user = self.scope.get('user')
 
-        if not self.user:
-            # print("Authentication failed, rejecting connection")
-            await self.close(code=4001)  # Custom code for authentication failure
+        if not self.user or isinstance(self.user, AnonymousUser):
+            await self.close(code=4001)
             return
 
-        # Check if post exists
         post = await self.get_post(self.post_id)
         if not post:
-            # print(f"Post {self.post_id} not found")
-            await self.close(code=4002)  # Custom code for post not found
+            await self.close(code=4002)
             return
 
-        # Join room group
         await self.channel_layer.group_add(
             self.room_group_name,
             self.channel_name
         )
         
         await self.accept()
-        # print(f"WebSocket connection accepted for user: {self.user.username} on post: {self.post_id}")
         
-        # Send connection confirmation
         await self.send(text_data=json.dumps({
             'type': 'connection_established',
             'message': 'WebSocket connection established successfully',
@@ -84,8 +39,6 @@ class PostConsumer(AsyncWebsocketConsumer):
         }))
 
     async def disconnect(self, close_code):
-        # print(f"WebSocket disconnected with code: {close_code}")
-        # Leave room group
         await self.channel_layer.group_discard(
             self.room_group_name,
             self.channel_name
@@ -95,32 +48,8 @@ class PostConsumer(AsyncWebsocketConsumer):
         try:
             text_data_json = json.loads(text_data)
             action = text_data_json.get('action')
-            # print(f"Received action: {action} from user: {self.user.username if self.user else 'Unknown'}")
             
-            # Handle authentication message
-            if action == 'authenticate':
-                token = text_data_json.get('token')
-                if token:
-                    try:
-                        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
-                        user_id = payload.get('user_id')
-                        if user_id:
-                            self.user = await self.get_user(user_id)
-                            # print(f"User authenticated via message: {self.user.username}")
-                            await self.send(text_data=json.dumps({
-                                'type': 'authentication',
-                                'status': 'success'
-                            }))
-                    except Exception as e:
-                        # print(f"Authentication failed: {e}")
-                        await self.send(text_data=json.dumps({
-                            'type': 'authentication',
-                            'status': 'failed',
-                            'error': str(e)
-                        }))
-                return
-
-            if not self.user:
+            if not self.user or isinstance(self.user, AnonymousUser):
                 await self.send(text_data=json.dumps({
                     'error': 'Authentication required'
                 }))
@@ -133,12 +62,10 @@ class PostConsumer(AsyncWebsocketConsumer):
                 if content:
                     await self.handle_comment(content)
                     
-        except json.JSONDecodeError as e:
+        except json.JSONDecodeError:
             pass
-            # print(f"Error parsing JSON: {e}")
-        except Exception as e:
+        except Exception:
             pass
-            # print(f"Error in receive: {e}")
 
     async def handle_like(self):
         try:
@@ -151,7 +78,6 @@ class PostConsumer(AsyncWebsocketConsumer):
                 
                 # print(f"User {user.username} {'liked' if liked else 'unliked'} post {post.id}")
                 
-                # Send message to room group
                 await self.channel_layer.group_send(
                     self.room_group_name,
                     {
@@ -176,7 +102,6 @@ class PostConsumer(AsyncWebsocketConsumer):
                 
                 # print(f"User {user.username} commented on post {post.id}")
                 
-                # Send message to room group
                 await self.channel_layer.group_send(
                     self.room_group_name,
                     {
