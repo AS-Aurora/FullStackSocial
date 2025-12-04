@@ -4,10 +4,12 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import axios from 'axios';
+import { chatAPI } from '@/service/chatApi';
 
 const NavBar: React.FC = () => {
   const [user, setUser] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [unreadCount, setUnreadCount] = useState(0);
   const router = useRouter();
   const pathname = usePathname();
 
@@ -24,6 +26,25 @@ const NavBar: React.FC = () => {
 
     checkAuthStatus();
   }, [pathname, isPublicRoute]);
+
+  useEffect(() => {
+    if (user) {
+      fetchUnreadCount();
+      
+      // Poll for unread count every 30 seconds
+      const interval = setInterval(fetchUnreadCount, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [user]);
+
+  const fetchUnreadCount = async () => {
+    try {
+      const count = await chatAPI.getUnreadCount();
+      setUnreadCount(count);
+    } catch (error) {
+      console.error('Error fetching unread count:', error);
+    }
+  };
 
   const checkAuthStatus = async () => {
     try {
@@ -95,6 +116,22 @@ const NavBar: React.FC = () => {
                 >
                   Create Post
                 </Link>
+                
+                {/* Messages Link with Badge */}
+                <Link 
+                  href="/chat" 
+                  className="relative text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
+                >
+                  <span className="flex items-center">
+                    💬 Messages
+                    {unreadCount > 0 && (
+                      <span className="ml-2 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                        {unreadCount > 9 ? '9+' : unreadCount}
+                      </span>
+                    )}
+                  </span>
+                </Link>
+
                 <Link 
                   href={`/profile/${user.pk}`}
                   className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
