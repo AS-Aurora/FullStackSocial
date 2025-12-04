@@ -4,6 +4,12 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import axios from "axios";
 import { motion } from "framer-motion";
+import ChatButton from "@/components/ChatButton";
+
+const getImageUrl = (path?: string) => {
+  if (!path || path.startsWith("http")) return path || "/default.webp";
+  return `http://localhost:8000${path.startsWith('/') ? path : '/' + path}`;
+};
 
 type UserProfile = {
   id: string;
@@ -20,6 +26,7 @@ export default function ProfilePage() {
   const router = useRouter();
   const { id } = params;
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const handleLogout = async () => {
@@ -28,23 +35,22 @@ export default function ProfilePage() {
       await axios.post("http://localhost:8000/api/auth/logout/", {}, { withCredentials: true });
       router.push("/login");
     } catch (error) {
-      console.error("Logout error:", error);
       router.push("/");
     } finally {
       setIsLoggingOut(false);
     }
   };
 
-  const getImageUrl = (url?: string) => {
-    if (!url) return "/default.webp";
-    return url.startsWith("http") ? url : `http://localhost:8000${url.startsWith('/') ? url : '/' + url}`;
-  };
-
   useEffect(() => {
+    axios
+      .get("http://localhost:8000/api/auth/user/", { withCredentials: true })
+      .then((res) => setCurrentUser(res.data))
+      .catch(() => {});
+
     axios
       .get(`http://localhost:8000/api/auth/profile/${id}/`)
       .then((res) => setProfile(res.data))
-      .catch((err) => console.error(err));
+      .catch(() => {});
   }, [id]);
 
   if (!profile)
@@ -53,6 +59,8 @@ export default function ProfilePage() {
         <div className="animate-spin h-12 w-12 border-b-2 border-white rounded-full"></div>
       </div>
     );
+
+  const isOwnProfile = currentUser?.pk === profile.id;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 flex items-center justify-center px-4">
@@ -69,10 +77,7 @@ export default function ProfilePage() {
               src={getImageUrl(profile.profile_picture)}
               alt="Profile"
               className="w-full h-full object-cover"
-              onError={(e) => {
-                console.error("Image failed to load:", profile.profile_picture);
-                (e.target as HTMLImageElement).src = "/default.webp";
-              }}
+              onError={(e) => (e.target as HTMLImageElement).src = "/default.webp"}
             />
           </div>
         </div>
@@ -102,22 +107,41 @@ export default function ProfilePage() {
 
         {/* Buttons */}
         <div className="space-y-3">
-          <motion.button
-            whileTap={{ scale: 0.95 }}
-            onClick={() => router.push(`/profile/${id}/edit`)}
-            className="w-full py-2.5 text-white font-semibold rounded-lg bg-gradient-to-r from-blue-500 to-purple-500 hover:opacity-90 hover:shadow-lg transition-all"
-          >
-            Edit Profile
-          </motion.button>
+          {isOwnProfile ? (
+            <>
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                onClick={() => router.push(`/profile/${id}/edit`)}
+                className="w-full py-2.5 text-white font-semibold rounded-lg bg-gradient-to-r from-blue-500 to-purple-500 hover:opacity-90 hover:shadow-lg transition-all"
+              >
+                Edit Profile
+              </motion.button>
 
-          <motion.button
-            whileTap={{ scale: 0.95 }}
-            onClick={handleLogout}
-            disabled={isLoggingOut}
-            className="w-full py-2.5 text-white font-semibold rounded-lg bg-gradient-to-r from-red-500 to-pink-500 hover:opacity-90 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isLoggingOut ? "Logging out..." : "Logout"}
-          </motion.button>
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                onClick={handleLogout}
+                disabled={isLoggingOut}
+                className="w-full py-2.5 text-white font-semibold rounded-lg bg-gradient-to-r from-red-500 to-pink-500 hover:opacity-90 hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isLoggingOut ? "Logging out..." : "Logout"}
+              </motion.button>
+            </>
+          ) : (
+            <>
+              <ChatButton
+                userId={profile.id}
+                username={profile.username}
+                className="w-full"
+              />
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                onClick={() => router.push("/")}
+                className="w-full py-2.5 text-white/80 font-semibold rounded-lg bg-white/10 hover:bg-white/20 transition-all"
+              >
+                Back to Feed
+              </motion.button>
+            </>
+          )}
         </div>
       </motion.div>
     </div>
