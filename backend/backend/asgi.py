@@ -10,13 +10,15 @@ from channels.routing import ProtocolTypeRouter, URLRouter
 from channels.auth import AuthMiddlewareStack
 from channels.security.websocket import AllowedHostsOriginValidator
 import posts.routing
+import chat.routing
+from chat.middleware import JWTAuthMiddleware
 
 application = ProtocolTypeRouter({
     "http": get_asgi_application(),
     "websocket": AllowedHostsOriginValidator(
-        AuthMiddlewareStack(
+        JWTAuthMiddleware(
             URLRouter(
-                posts.routing.websocket_urlpatterns
+                posts.routing.websocket_urlpatterns + chat.routing.websocket_urlpatterns
             )
         )
     ),

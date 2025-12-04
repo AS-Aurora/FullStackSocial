@@ -10,6 +10,7 @@ urlpatterns = [
     path('api/auth/registration/', include('dj_rest_auth.registration.urls')),
     path('auth/', include('django.contrib.auth.urls')),
     path('api/', include('posts.urls')),
+    path('api/chat/', include('chat.urls')),
 ]
 
 if settings.DEBUG:
