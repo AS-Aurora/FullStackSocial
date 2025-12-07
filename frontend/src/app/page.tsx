@@ -1,4 +1,3 @@
-// app/page.tsx
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -22,7 +21,6 @@ export default function HomePage() {
       const postsData = await postAPI.getPosts();
       setPosts(postsData);
     } catch (err) {
-      console.error('Error fetching posts:', err);
       setError('Failed to load posts. Please try again later.');
     } finally {
       setIsLoading(false);
