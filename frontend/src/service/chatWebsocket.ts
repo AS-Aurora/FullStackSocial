@@ -1,5 +1,6 @@
 export interface WebSocketMessage {
-  type: 'message' | 'user_status' | 'typing' | 'messages_read';
+  type: 'message' | 'user_status' | 'typing' | 'messages_read' | 'call_incoming' | 'call_accepted' | 'call_rejected' | 'call_ended' | 'webrtc_offer' | 'webrtc_answer' | 'webrtc_ice_candidate';
+
   message_id?: string;
   message?: string;
   sender_id?: string;
@@ -13,6 +14,20 @@ export interface WebSocketMessage {
   is_typing?: boolean;
   message_ids?: string[];
   reader_id?: string;
+
+  call_id?: string;
+  call_type?: 'video' | 'audio';
+  caller_id?: string;
+  caller_username?: string;
+  caller_profile_picture?: string;
+  acceptor_id?: string;
+  acceptor_username?: string;
+  rejector_id?: string;
+  ended_by?: string;
+
+  offer?: RTCSessionDescriptionInit;
+  answer?: RTCSessionDescriptionInit;
+  candidate?: RTCIceCandidateInit;
 }
 
 class ChatWebSocketService {
@@ -32,7 +47,6 @@ class ChatWebSocketService {
     this.conversationId = conversationId;
     this.isConnecting = true;
 
-    // Close existing connection if switching conversations
     if (this.socket && this.socket.readyState === WebSocket.OPEN && this.conversationId !== conversationId) {
       this.disconnect();
     }
@@ -45,9 +59,7 @@ class ChatWebSocketService {
       this.socket.onopen = () => {
         this.isConnecting = false;
         this.reconnectAttempts = 0;
-        
-        // Request status from all participants after connection with longer delay
-        // This ensures disconnect events are processed first
+
         setTimeout(() => {
           this.requestStatus();
         }, 1000);
@@ -56,15 +68,12 @@ class ChatWebSocketService {
       this.socket.onclose = (event) => {
         this.isConnecting = false;
 
-        // Attempt reconnect if not a normal closure
         if (event.code !== 1000 && event.code !== 1001) {
           this.attemptReconnect();
         }
       };
 
       this.socket.onerror = (error) => {
-        // Don't log error - it will be handled by onclose event
-        // The error event doesn't provide useful information in browsers
         this.isConnecting = false;
       };
 
@@ -73,7 +82,6 @@ class ChatWebSocketService {
           const data: WebSocketMessage = JSON.parse(event.data);
           this.notifyMessageCallbacks(data);
         } catch (error) {
-          // Ignore parse errors
         }
       };
 
@@ -93,16 +101,17 @@ class ChatWebSocketService {
     }
   }
 
+
+// Message handling methods
   private notifyMessageCallbacks(data: WebSocketMessage) {
     this.messageCallbacks.forEach(callback => {
       try {
         callback(data);
       } catch (error) {
-        // Ignore callback errors
       }
     });
   }
-
+  
   sendMessage(content: string) {
     if (this.socket && this.socket.readyState === WebSocket.OPEN) {
       this.socket.send(JSON.stringify({
@@ -121,19 +130,69 @@ class ChatWebSocketService {
     }
   }
 
-requestStatus() {
-  if (this.socket && this.socket.readyState === WebSocket.OPEN) {
-    this.socket.send(JSON.stringify({
-      action: 'request_status'
-    }));
+  requestStatus() {
+    if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+      this.socket.send(JSON.stringify({
+        action: 'request_status'
+      }));
+    }
   }
-}
 
   markAsRead(messageIds: string[]) {
     if (this.socket && this.socket.readyState === WebSocket.OPEN) {
       this.socket.send(JSON.stringify({
         action: 'mark_read',
         message_ids: messageIds
+      }));
+    }
+  }
+
+// Call management methods
+  initiateCall(callType: 'video' | 'audio' = 'video') {
+    if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+      this.socket.send(JSON.stringify({
+        action: 'call_initiate',
+        call_type: callType
+      }));
+    }
+  }
+
+  // - Accept call
+  acceptCall(callId: string) {
+    if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+      this.socket.send(JSON.stringify({
+        action: 'call_accept',
+        call_id: callId
+      }));
+    }
+  }
+
+  // - Reject call
+  rejectCall(callId: string) {
+    if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+      this.socket.send(JSON.stringify({
+        action: 'call_reject',
+        call_id: callId
+      }));
+    }
+  }
+
+  // - End call
+  endCall(callId: string) {
+    if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+      this.socket.send(JSON.stringify({
+        action: 'call_end',
+        call_id: callId
+      }));
+    }
+  }
+
+// Signaling methods
+  sendCallSignal(action: string, data: any) {
+    if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+      this.socket.send(JSON.stringify({
+        action,
+        ...data
       }));
     }
   }

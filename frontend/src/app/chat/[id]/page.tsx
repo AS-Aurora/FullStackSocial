@@ -4,7 +4,9 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { chatAPI, ConversationDetail, Message as MessageType } from '@/service/chatApi';
 import { createChatWebSocketService, WebSocketMessage } from '@/service/chatWebsocket';
+import VideoCallModal from '@/components/VideoCallModal';
 import { motion } from 'framer-motion';
+import { Video, Phone } from 'lucide-react';
 import axios from 'axios';
 
 const getImageUrl = (path?: string) => {
@@ -32,29 +34,36 @@ export default function ChatConversationPage() {
   const [otherUserOnline, setOtherUserOnline] = useState(false);
   const [otherUserTyping, setOtherUserTyping] = useState(false);
 
+  const [isCallModalOpen, setIsCallModalOpen] = useState(false);
+  const [callType, setCallType] = useState<'incoming' | 'outgoing'>('outgoing');
+  const [incomingCallData, setIncomingCallData] = useState<any>(null);
+  const [isRinging, setIsRinging] = useState(false);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const wsServiceRef = useRef(createChatWebSocketService());
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
-    // Get current user
-    axios
-      .get('http://localhost:8000/api/auth/user/', { withCredentials: true })
+    // Create ringtone audio element
+    audioRef.current = new Audio('/ringtone.mp3');
+    audioRef.current.loop = true;
+
+    axios.get('http://localhost:8000/api/auth/user/', { withCredentials: true })
       .then((res) => setCurrentUser(res.data))
       .catch((err) => {
-        console.error('Error fetching current user:', err);
         router.push('/login');
       });
 
-    // Fetch conversation
     fetchConversation();
 
-    // Connect WebSocket
     const wsService = wsServiceRef.current;
     wsService.connect(conversationId);
 
     const handleWebSocketMessage = (data: WebSocketMessage) => {
       switch (data.type) {
+
+//  Message handlers
         case 'message':
           if (data.message_id && data.message && data.sender_username) {
             const newMessage: MessageType = {
@@ -78,7 +87,6 @@ export default function ChatConversationPage() {
               return [...prev, newMessage];
             });
 
-            // Mark as read if not from current user
             if (currentUser && data.sender_id !== currentUser.pk) {
               setTimeout(() => {
                 wsService.markAsRead([data.message_id!]);
@@ -88,7 +96,6 @@ export default function ChatConversationPage() {
           break;
 
         case 'user_status':
-          // Only update if it's the other user's status, not our own
           const myUserId = currentUser?.pk || currentUser?.id;
           if (myUserId && data.user_id !== String(myUserId)) {
             setOtherUserOnline(data.status === 'online');
@@ -108,6 +115,45 @@ export default function ChatConversationPage() {
             );
           }
           break;
+
+//Call handlers        
+        case 'call_incoming':
+          setIncomingCallData(data);
+          setCallType('incoming');
+          setIsCallModalOpen(true);
+          setIsRinging(true);
+          
+          if (audioRef.current) {
+            audioRef.current.play().catch(err => console.error('Error playing ringtone:', err));
+          }
+          break;
+
+        case 'call_accepted':
+          setIsRinging(false);
+          if (audioRef.current) {
+            audioRef.current.pause();
+            audioRef.current.currentTime = 0;
+          }
+          break;
+
+        case 'call_rejected':
+          setIsCallModalOpen(false);
+          setIsRinging(false);
+          if (audioRef.current) {
+            audioRef.current.pause();
+            audioRef.current.currentTime = 0;
+          }
+          alert('Call was rejected');
+          break;
+
+        case 'call_ended':
+          setIsCallModalOpen(false);
+          setIsRinging(false);
+          if (audioRef.current) {
+            audioRef.current.pause();
+            audioRef.current.currentTime = 0;
+          }
+          break;
       }
     };
 
@@ -116,6 +162,9 @@ export default function ChatConversationPage() {
     return () => {
       wsService.removeMessageCallback(handleWebSocketMessage);
       wsService.disconnect();
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
     };
   }, [conversationId, currentUser?.pk, router]);
 
@@ -140,6 +189,60 @@ export default function ChatConversationPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+// Call functions
+  const handleInitiateVideoCall = () => {
+    const wsService = wsServiceRef.current;
+    wsService.initiateCall('video');
+    setCallType('outgoing');
+    setIsCallModalOpen(true);
+  };
+
+  const handleInitiateAudioCall = () => {
+    const wsService = wsServiceRef.current;
+    wsService.initiateCall('audio');
+    setCallType('outgoing');
+    setIsCallModalOpen(true);
+  };
+
+  const handleAcceptCall = () => {
+    const wsService = wsServiceRef.current;
+    if (incomingCallData?.call_id) {
+      wsService.acceptCall(incomingCallData.call_id);
+    }
+    setIsRinging(false);
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+  };
+
+  const handleRejectCall = () => {
+    const wsService = wsServiceRef.current;
+    if (incomingCallData?.call_id) {
+      wsService.rejectCall(incomingCallData.call_id);
+    }
+    setIsCallModalOpen(false);
+    setIsRinging(false);
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+  };
+
+  const handleCloseCallModal = () => {
+    const wsService = wsServiceRef.current;
+    if (incomingCallData?.call_id) {
+      wsService.endCall(incomingCallData.call_id);
+    }
+    setIsCallModalOpen(false);
+    setIsRinging(false);
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+  };
+
+// Message functions
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     const content = inputMessage.trim();
@@ -228,12 +331,32 @@ export default function ChatConversationPage() {
           </div>
         </div>
 
-        <button
-          onClick={() => router.push(`/profile/${otherParticipant?.id}`)}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm"
-        >
-          View Profile
-        </button>
+        <div className="flex items-center space-x-2">
+          {/* Audio Call Button */}
+          <button
+            onClick={handleInitiateAudioCall}
+            className="p-2 bg-gray-100 rounded-full hover:bg-gray-200 transition"
+            title="Audio Call"
+          >
+            <Phone className="w-5 h-5 text-gray-700" />
+          </button>
+
+          {/* Video Call Button */}
+          <button
+            onClick={handleInitiateVideoCall}
+            className="p-2 bg-blue-100 rounded-full hover:bg-blue-200 transition"
+            title="Video Call"
+          >
+            <Video className="w-5 h-5 text-blue-600" />
+          </button>
+
+          <button
+            onClick={() => router.push(`/profile/${otherParticipant?.id}`)}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm"
+          >
+            View Profile
+          </button>
+        </div>
       </div>
 
       {/* Messages */}
@@ -309,6 +432,21 @@ export default function ChatConversationPage() {
           </button>
         </form>
       </div>
+
+      {/* Video Call Modal */}
+      <VideoCallModal
+        isOpen={isCallModalOpen}
+        onClose={handleCloseCallModal}
+        callType={callType}
+        otherUser={{
+          username: otherParticipant?.username || '',
+          profile_picture: otherParticipant?.profile_picture,
+        }}
+        onAccept={handleAcceptCall}
+        onReject={handleRejectCall}
+        webSocketService={wsServiceRef.current}
+        callId={incomingCallData?.call_id}
+      />
     </div>
   );
-}
+} 

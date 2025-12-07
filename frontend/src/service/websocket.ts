@@ -78,7 +78,6 @@ class WebSocketService {
             this.notifyMessageCallbacks(data);
           }
         } catch (error) {
-          console.error('Error parsing WebSocket message:', error, event.data);
         }
       };
 
