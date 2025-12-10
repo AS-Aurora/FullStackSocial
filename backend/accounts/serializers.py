@@ -66,3 +66,66 @@ class UserSerializer(serializers.ModelSerializer):
             request = self.context.get('request')
             data['profile_picture'] = (request.build_absolute_uri(obj.profile_picture.url) if request else obj.profile_picture.url)
         return data
+
+from rest_framework import serializers
+from django.contrib.auth import get_user_model
+from .models import Follow
+
+User = get_user_model()
+
+
+class FollowSerializer(serializers.ModelSerializer):
+    """Serializer for Follow model"""
+    follower = serializers.StringRelatedField(read_only=True)
+    following = serializers.StringRelatedField(read_only=True)
+    follower_id = serializers.UUIDField(source='follower.id', read_only=True)
+    following_id = serializers.UUIDField(source='following.id', read_only=True)
+    
+    class Meta:
+        model = Follow
+        fields = ['id', 'follower', 'following', 'follower_id', 'following_id', 'created_at']
+        read_only_fields = ['id', 'created_at']
+
+
+class UserProfileSerializer(serializers.ModelSerializer):
+
+    followers_count = serializers.SerializerMethodField()
+    following_count = serializers.SerializerMethodField()
+    is_following = serializers.SerializerMethodField()
+    profile_picture = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = User
+        fields = [
+            'id', 'username', 'email', 'profile_picture', 
+            'location', 'bio', 'full_name', 'created_at',
+            'followers_count', 'following_count', 'is_following'
+        ]
+        read_only_fields = ['id', 'email', 'created_at']
+    
+    def get_followers_count(self, obj):
+        """Count of users following this user"""
+        return obj.followers_set.count()
+    
+    def get_following_count(self, obj):
+        """Count of users this user is following"""
+        return obj.following_set.count()
+    
+    def get_is_following(self, obj):
+        """Check if request user follows this user"""
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return Follow.objects.filter(
+                follower=request.user,
+                following=obj
+            ).exists()
+        return False
+    
+    def get_profile_picture(self, obj):
+        """Return full URL for profile picture"""
+        if obj.profile_picture:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.profile_picture.url)
+            return obj.profile_picture.url
+        return None

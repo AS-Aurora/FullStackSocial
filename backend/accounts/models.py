@@ -46,3 +46,27 @@ class CustomUser(AbstractUser):
     @property
     def full_name(self):
         return f"{self.first_name} {self.last_name}".strip() or self.username
+
+class Follow(models.Model):
+    follower = models.ForeignKey('CustomUser',related_name='following_set',on_delete=models.CASCADE)
+    following = models.ForeignKey('CustomUser', related_name='followers_set', on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'follow'
+        unique_together = ('follower', 'following')
+        indexes = [
+            models.Index(fields=['follower', '-created_at']),
+            models.Index(fields=['following', '-created_at']),
+        ]
+        ordering = ['-created_at']
+        verbose_name = 'Follow'
+        verbose_name_plural = 'Follows'
+
+    def __str__(self):
+        return f"{self.follower.username} follows {self.following.username}"
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        if self.follower == self.following: # Check and prevent users from following themselves
+            raise ValidationError("Users cannot follow themselves")

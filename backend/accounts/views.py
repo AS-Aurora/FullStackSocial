@@ -1,4 +1,3 @@
-from django.shortcuts import render
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -7,13 +6,10 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from allauth.account.models import EmailAddress
 from rest_framework.permissions import AllowAny
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework_simplejwt.exceptions import TokenError
-from rest_framework import serializers
 from .adapters import CustomAccountAdapter
 from .serializers import UserSerializer
 from rest_framework import permissions
-from rest_framework import generics
+from rest_framework import generics, status
 from django.contrib.auth.tokens import default_token_generator
 from django.utils.http import urlsafe_base64_decode
 from django.utils.encoding import force_str
@@ -196,3 +192,135 @@ class UserDetailView(generics.RetrieveUpdateAPIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)
+
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
+from .models import Follow
+from .serializers import FollowSerializer, UserProfileSerializer
+
+class FollowUserView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, user_id):
+        try:
+            target_user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response(
+                {'detail': 'User not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        if target_user == request.user:
+            return Response(
+                {'detail': 'You cannot follow yourself'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        follow, created = Follow.objects.get_or_create(
+            follower=request.user,
+            following=target_user
+        )
+
+        if not created:
+            return Response(
+                {'detail': 'You are already following this user'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        channel_layer = get_channel_layer()
+        notification_data = {
+            'type': 'send_notification',
+            'notification': {
+                'type': 'follow',
+                'from_user': {
+                    'id': str(request.user.id),
+                    'username': request.user.username,
+                    'profile_picture': request.user.profile_picture.url if request.user.profile_picture else None,
+                },
+                'message': f'{request.user.username} started following you',
+                'created_at': follow.created_at.isoformat(),
+            }
+        }
+        
+        async_to_sync(channel_layer.group_send)(
+            f"user_{target_user.id}",
+            notification_data
+        )
+
+        serializer = FollowSerializer(follow, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class UnfollowUserView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def delete(self, request, user_id):
+        deleted_count, _ = Follow.objects.filter(
+            follower=request.user,
+            following_id=user_id
+        ).delete()
+
+        if deleted_count == 0:
+            return Response(
+                {'detail': 'You are not following this user'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        return Response(
+            {'detail': 'Successfully unfollowed user'},
+            status=status.HTTP_200_OK
+        )
+
+
+class CheckFollowStatusView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, user_id):
+        is_following = Follow.objects.filter(
+            follower=request.user,
+            following_id=user_id
+        ).exists()
+
+        return Response({
+            'is_following': is_following
+        })
+
+
+class FollowersListView(generics.ListAPIView):
+    serializer_class = UserProfileSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user_id = self.kwargs.get('user_id')
+        
+        follower_ids = Follow.objects.filter(
+            following_id=user_id
+        ).values_list('follower_id', flat=True)
+        
+        return User.objects.filter(id__in=follower_ids)
+    
+class FollowingListView(generics.ListAPIView):
+    serializer_class = UserProfileSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user_id = self.kwargs.get('user_id')
+        
+        following_ids = Follow.objects.filter(
+            follower_id=user_id
+        ).values_list('following_id', flat=True)
+        
+        return User.objects.filter(id__in=following_ids)
+
+class CheckFollowStatusView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, user_id):
+        is_following = Follow.objects.filter(
+            follower=request.user,
+            following_id=user_id
+        ).exists()
+
+        return Response({
+            'is_following': is_following
+        })
