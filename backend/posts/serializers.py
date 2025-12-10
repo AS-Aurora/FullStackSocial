@@ -36,3 +36,22 @@ class PostSerializer(serializers.ModelSerializer):
         if request and request.user.is_authenticated:
             return obj.likes.filter(id=request.user.id).exists()
         return False
+
+from accounts.serializers import UserProfileSerializer
+
+class FeedPostSerializer(PostSerializer):
+    author = UserProfileSerializer(read_only=True)
+    like_count = serializers.ReadOnlyField()
+    comment_count = serializers.ReadOnlyField()
+    is_liked = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Post
+        fields = ['id', 'content', 'image', 'video', 'author', 'privacy', 'created_at', 'like_count', 'comment_count', 'is_liked']
+        read_only_fields = ['id', 'author', 'created_at']
+
+        def get_is_liked(self, obj):
+            request = self.context.get('request')
+            if request and request.user.is_authenticated:
+                return obj.likes.filter(id=request.user.id).exists()
+            return False
