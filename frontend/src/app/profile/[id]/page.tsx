@@ -5,6 +5,8 @@ import { useParams, useRouter } from "next/navigation";
 import axios from "axios";
 import { motion } from "framer-motion";
 import ChatButton from "@/components/ChatButton";
+import FollowButton from "@/components/FollowButton";
+import { followAPI } from "@/service/followApi";
 
 const getImageUrl = (path?: string) => {
   if (!path || path.startsWith("http")) return path || "/default.webp";
@@ -19,6 +21,9 @@ type UserProfile = {
   location?: string;
   bio?: string;
   created_at?: string;
+  followers_count?: number;
+  following_count?: number;
+  is_following?: boolean;
 };
 
 export default function ProfilePage() {
@@ -28,6 +33,8 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [followersCount, setFollowersCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
@@ -42,15 +49,39 @@ export default function ProfilePage() {
   };
 
   useEffect(() => {
-    axios
-      .get("http://localhost:8000/api/auth/user/", { withCredentials: true })
-      .then((res) => setCurrentUser(res.data))
-      .catch(() => {});
+    const fetchData = async () => {
+      try {
+        // Get current user
+        const userRes = await axios.get("http://localhost:8000/api/auth/user/", { withCredentials: true });
+        setCurrentUser(userRes.data);
+      } catch (err) {
+        // Ignore error
+      }
 
-    axios
-      .get(`http://localhost:8000/api/auth/profile/${id}/`)
-      .then((res) => setProfile(res.data))
-      .catch(() => {});
+      try {
+        // Get profile
+        const profileRes = await axios.get(`http://localhost:8000/api/auth/profile/${id}/`);
+        setProfile(profileRes.data);
+        setFollowersCount(profileRes.data.followers_count || 0);
+        setFollowingCount(profileRes.data.following_count || 0);
+      } catch (err) {
+        // Ignore error
+      }
+
+      try {
+        // Fetch actual followers and following counts
+        const [followers, following] = await Promise.all([
+          followAPI.getFollowers(id as string),
+          followAPI.getFollowing(id as string)
+        ]);
+        setFollowersCount(followers.length);
+        setFollowingCount(following.length);
+      } catch (err) {
+        console.error('Error fetching follow counts:', err);
+      }
+    };
+
+    fetchData();
   }, [id]);
 
   if (!profile)
@@ -79,6 +110,18 @@ export default function ProfilePage() {
               className="w-full h-full object-cover"
               onError={(e) => (e.target as HTMLImageElement).src = "/default.webp"}
             />
+          </div>
+        </div>
+
+        {/* Follow Statistics */}
+        <div className="flex justify-center space-x-8 mb-6">
+          <div className="text-center">
+            <p className="text-2xl font-bold text-white">{followersCount}</p>
+            <p className="text-sm text-white/60">Followers</p>
+          </div>
+          <div className="text-center">
+            <p className="text-2xl font-bold text-white">{followingCount}</p>
+            <p className="text-sm text-white/60">Following</p>
           </div>
         </div>
 
@@ -128,11 +171,19 @@ export default function ProfilePage() {
             </>
           ) : (
             <>
-              <ChatButton
-                userId={profile.id}
-                username={profile.username}
-                className="w-full"
-              />
+              <>
+                <FollowButton
+                  userId={profile.id}
+                  initialFollowing={profile.is_following}
+                  onFollowChange={(following) => {
+                    setFollowersCount(prev => following ? prev + 1 : prev - 1);
+                  }}
+                  className="w-full mb-3"/>
+                <ChatButton
+                  userId={profile.id}
+                  username={profile.username}
+                  className="w-full"/>
+              </>
               <motion.button
                 whileTap={{ scale: 0.95 }}
                 onClick={() => router.push("/")}

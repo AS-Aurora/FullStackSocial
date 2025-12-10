@@ -14,7 +14,7 @@ const NavBar: React.FC = () => {
   const pathname = usePathname();
 
   const publicRoutes = ['/login', '/registration', '/forgot-password', '/reset-password', '/verify-email'];
-  
+
   const isPublicRoute = publicRoutes.some(route => pathname.startsWith(route));
 
   useEffect(() => {
@@ -30,7 +30,7 @@ const NavBar: React.FC = () => {
   useEffect(() => {
     if (user) {
       fetchUnreadCount();
-      
+
       // Poll for unread count every 30 seconds
       const interval = setInterval(fetchUnreadCount, 30000);
       return () => clearInterval(interval);
@@ -69,10 +69,10 @@ const NavBar: React.FC = () => {
 
   const handleLogout = async () => {
     try {
-      await axios.post('http://localhost:8000/api/auth/logout/',{} , {
+      await axios.post('http://localhost:8000/api/auth/logout/', {}, {
         withCredentials: true,
       });
-      
+
       setUser(null);
       router.push('/login');
       router.refresh();
@@ -110,16 +110,16 @@ const NavBar: React.FC = () => {
           <div className="flex items-center space-x-4">
             {user ? (
               <>
-                <Link 
-                  href="/create-post" 
+                <Link
+                  href="/create-post"
                   className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
                 >
                   Create Post
                 </Link>
-                
+
                 {/* Messages Link with Badge */}
-                <Link 
-                  href="/chat" 
+                <Link
+                  href="/chat"
                   className="relative text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
                 >
                   <span className="flex items-center">
@@ -132,14 +132,20 @@ const NavBar: React.FC = () => {
                   </span>
                 </Link>
 
-                <Link 
+                <Link
                   href={`/profile/${user.pk}`}
                   className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
                 >
                   Profile
                 </Link>
                 <span className="text-gray-700">Welcome, {user.username}</span>
-                <button 
+                <Link
+                  href="/feed"
+                  className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
+                >
+                  Feed
+                </Link>
+                <button
                   onClick={handleLogout}
                   className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm"
                 >
@@ -148,14 +154,14 @@ const NavBar: React.FC = () => {
               </>
             ) : (
               <>
-                <Link 
-                  href="/login" 
+                <Link
+                  href="/login"
                   className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
                 >
                   Login
                 </Link>
-                <Link 
-                  href="/registration" 
+                <Link
+                  href="/registration"
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
                 >
                   Sign Up
