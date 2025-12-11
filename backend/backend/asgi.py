@@ -11,13 +11,14 @@ from channels.security.websocket import AllowedHostsOriginValidator
 import posts.routing
 import chat.routing
 from chat.middleware import JWTAuthMiddleware
+import notifications.routing
 
 application = ProtocolTypeRouter({
     "http": get_asgi_application(),
     "websocket": AllowedHostsOriginValidator(
         JWTAuthMiddleware(
             URLRouter(
-                posts.routing.websocket_urlpatterns + chat.routing.websocket_urlpatterns
+                posts.routing.websocket_urlpatterns + chat.routing.websocket_urlpatterns + notifications.routing.websocket_urlpatterns
             )
         )
     ),

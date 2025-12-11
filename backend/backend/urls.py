@@ -11,6 +11,7 @@ urlpatterns = [
     path('auth/', include('django.contrib.auth.urls')),
     path('api/', include('posts.urls')),
     path('api/chat/', include('chat.urls')),
+    path('api/notifications/', include('notifications.urls')),
 ]
 
 if settings.DEBUG:
