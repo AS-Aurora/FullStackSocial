@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import axios from 'axios';
 import { chatAPI } from '@/service/chatApi';
+import { notificationAPI } from '@/service/notificationApi';
 
 const NavBar: React.FC = () => {
   const [user, setUser] = useState<any>(null);
@@ -12,6 +13,7 @@ const NavBar: React.FC = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const router = useRouter();
   const pathname = usePathname();
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
 
   const publicRoutes = ['/login', '/registration', '/forgot-password', '/reset-password', '/verify-email'];
 
@@ -23,16 +25,19 @@ const NavBar: React.FC = () => {
       setIsLoading(false);
       return;
     }
-
+    
     checkAuthStatus();
   }, [pathname, isPublicRoute]);
 
   useEffect(() => {
     if (user) {
       fetchUnreadCount();
+      fetchUnreadNotifications();
 
-      // Poll for unread count every 30 seconds
-      const interval = setInterval(fetchUnreadCount, 30000);
+      const interval = setInterval(() => {
+        fetchUnreadCount();
+        fetchUnreadNotifications();
+      }, 30000);
       return () => clearInterval(interval);
     }
   }, [user]);
@@ -43,6 +48,15 @@ const NavBar: React.FC = () => {
       setUnreadCount(count);
     } catch (error) {
       console.error('Error fetching unread count:', error);
+    }
+  };
+
+  const fetchUnreadNotifications = async () => {
+    try {
+      const count = await notificationAPI.getUnreadCount();
+      setUnreadNotifications(count);
+    } catch (error) {
+      console.error('Error fetching unread notifications:', error);
     }
   };
 
@@ -116,7 +130,19 @@ const NavBar: React.FC = () => {
                 >
                   Create Post
                 </Link>
-
+                <Link
+                  href="/notification"
+                  className="relative text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
+                >
+                  <span className="flex items-center">
+                    🔔 
+                    {unreadNotifications > 0 && (
+                      <span className="ml-2 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                        {unreadNotifications > 9 ? '9+' : unreadNotifications}
+                      </span>
+                    )}
+                  </span>
+                </Link>
                 {/* Messages Link with Badge */}
                 <Link
                   href="/chat"
