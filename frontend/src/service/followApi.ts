@@ -45,8 +45,10 @@ export const followAPI = {
     return response.data;
   },
 
-  async getFeed(): Promise<any[]> {
-    const response = await api.get('/feed/');
+  async getFeed(page: number = 1, pageSize: number = 10): Promise<{ results: any[], count: number, num_pages: number, page: number }> {
+    const response = await api.get('/feed/ranked/', {
+      params: { page, page_size: pageSize }
+    });
     return response.data;
   },
 

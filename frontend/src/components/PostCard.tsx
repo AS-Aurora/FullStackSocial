@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
 import { Post, Comment } from '@/types/post';
 import { createWebSocketService } from '@/service/websocket';
 import { postAPI } from '@/service/api';
@@ -41,13 +42,14 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
         
         case 'new_comment':
           setCurrentPost(prev => {
-            const commentExists = prev.comments.some(comment => comment.id === data.comment.id);
+            const comments = prev.comments || [];
+            const commentExists = comments.some(comment => comment.id === data.comment.id);
             if (commentExists) return prev;
 
             return {
               ...prev,
-              comments: [data.comment, ...prev.comments],
-              comment_count: prev.comment_count + 1
+              comments: [data.comment, ...comments],
+              comment_count: (prev.comment_count || 0) + 1
             };
           });
           break;
@@ -136,13 +138,14 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
       } else {
         const newCommentData = await postAPI.createComment(post.id, commentContent);
         setCurrentPost(prev => {
-          const commentExists = prev.comments.some(comment => comment.id === newCommentData.id);
+          const comments = prev.comments || [];
+          const commentExists = comments.some(comment => comment.id === newCommentData.id);
           if (commentExists) return prev;
           
           return {
             ...prev,
-            comments: [newCommentData, ...prev.comments],
-            comment_count: prev.comment_count + 1
+            comments: [newCommentData, ...comments],
+            comment_count: (prev.comment_count || 0) + 1
           };
         });
       }
@@ -207,9 +210,12 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
           <div className="flex-1">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="font-semibold text-gray-900">
+                <Link 
+                  href={`/profile/${currentPost.author?.id || ''}`}
+                  className="font-semibold text-gray-900 hover:text-blue-600 transition-colors cursor-pointer"
+                >
                   {currentPost.author?.full_name || currentPost.author?.username || 'Unknown User'}
-                </h3>
+                </Link>
                 <p className="text-sm text-gray-500">
                   {formatDate(currentPost.created_at)}
                 </p>
@@ -366,9 +372,12 @@ const PostCard: React.FC<PostCardProps> = ({ post }) => {
                   <div className="flex-1 min-w-0">
                     <div className="bg-white rounded-lg p-3 border border-gray-200">
                       <div className="flex items-center space-x-2 mb-2">
-                        <span className="font-semibold text-gray-900 text-sm">
+                        <Link 
+                          href={`/profile/${comment.author?.id || ''}`}
+                          className="font-semibold text-gray-900 text-sm hover:text-blue-600 transition-colors cursor-pointer"
+                        >
                           {comment.author?.full_name || comment.author?.username || 'Unknown User'}
-                        </span>
+                        </Link>
                         <span className="text-xs text-gray-500">
                           {formatDate(comment.created_at)}
                         </span>
